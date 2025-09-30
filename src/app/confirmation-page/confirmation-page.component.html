@@ -302,7 +302,7 @@
       <!-- Confirmation Form -->
       <div class="bg-white bg-opacity-90 border-2 border-gray-200 rounded-lg p-2 shadow-lg">
         <h3 class="text-2xl md:text-3xl font-bold text-gray-800 text-center mb-8">
-          اختر ردك
+          تأكيد أو إلغاء الموعد هنا
         </h3>
         
         <form class="space-y-6">
@@ -791,11 +791,11 @@
         <!-- Action Buttons -->
         <div class="flex space-x-3 space-x-reverse">
             <button (click)="$event.stopPropagation(); stayOnPage()" 
-                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors duration-200 mr-2">
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors duration-200 mr-2 py-1">
               نعم، أريد الاستمرار
             </button>
             <button (click)="$event.stopPropagation(); leavePage()" 
-                    class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg transition-colors duration-200 ml-2">
+                    class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg transition-colors duration-200 ml-2 py-1">
               لا، أريد المغادرة
             </button>
         </div>
