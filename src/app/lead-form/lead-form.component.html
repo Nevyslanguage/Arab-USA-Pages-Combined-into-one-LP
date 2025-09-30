@@ -40,11 +40,11 @@
       <label class="form-label">هل تفضل أن تأخذ اختباراً لتحديد مستواك، أم تريد أن تبدأ التعلم من الصفر بسهولة؟*</label>
       <div class="radio-group">
         <label class="radio-label">
-          <input type="radio" formControlName="levelPreference" value="test" class="radio-input" (change)="leadForm.get('levelPreference')?.markAsTouched()">
+          <input type="radio" formControlName="levelPreference" value="أريد أن أختبر مستواي" class="radio-input" (change)="leadForm.get('levelPreference')?.markAsTouched()">
           <span class="radio-text">أريد أن أختبر مستواي</span>
         </label>
         <label class="radio-label">
-          <input type="radio" formControlName="levelPreference" value="beginner" class="radio-input" (change)="leadForm.get('levelPreference')?.markAsTouched()">
+          <input type="radio" formControlName="levelPreference" value="أريد أن أبدأ من الصفر" class="radio-input" (change)="leadForm.get('levelPreference')?.markAsTouched()">
           <span class="radio-text">أريد أن أبدأ من الصفر</span>
         </label>
       </div>
@@ -107,9 +107,9 @@
       <div class="phone-input-container" [class.ng-invalid]="leadForm.get('phone')?.invalid" [class.ng-touched]="leadForm.get('phone')?.touched">
         <div class="phone-prefix">
           <span class="flag">🇺🇸</span>
-          <span class="country-code">+1</span>
+          <span class="country-code" dir="ltr">+1</span>
         </div>
-        <input type="tel" formControlName="phone" class="form-input english-input phone-number-input" placeholder="(xxx) xxx-xxxx" (input)="formatPhoneNumber($event)" (blur)="leadForm.get('phone')?.markAsTouched()">
+        <input type="tel" formControlName="phone" class="form-input english-input phone-number-input" placeholder="(xxx) xxx-xxxx" dir="ltr" (input)="formatPhoneNumber($event)" (blur)="leadForm.get('phone')?.markAsTouched()">
       </div>
       <div class="form-note">يرجى إدخال رقم هاتف أمريكي صحيح (10 أرقام) - سيتم إرساله بالتنسيق: +1 (xxx) xxx-xxxx</div>
       <div *ngIf="hasFieldErrors('phone')" class="error-message">
@@ -142,7 +142,7 @@
         <div class="whatsapp-prefix-container">
           <div class="whatsapp-prefix" (click)="toggleCountryDropdown()">
             <span class="flag">{{ getSelectedCountryFlag() }}</span>
-            <span class="country-code">{{ selectedCountryCode }}</span>
+            <span class="country-code" dir="ltr">{{ selectedCountryCode }}</span>
             <span class="dropdown-arrow">▼</span>
           </div>
           <div class="country-dropdown" *ngIf="showCountryDropdown">
@@ -167,7 +167,7 @@
             <div class="country-options-container">
               <div class="country-option" *ngFor="let country of filteredCountries" (click)="selectCountry(country)">
                 <span class="flag">{{ country.flag }}</span>
-                <span class="country-code">{{ country.code }}</span>
+                <span class="country-code" dir="ltr">{{ country.code }}</span>
                 <span class="country-name">{{ country.country }}</span>
               </div>
               <div class="no-results" *ngIf="filteredCountries.length === 0 && countrySearchTerm">
@@ -176,7 +176,7 @@
             </div>
           </div>
         </div>
-        <input type="tel" formControlName="whatsappNumber" class="form-input english-input whatsapp-number-input" placeholder="رقم الهاتف بدون رمز الدولة" (input)="formatWhatsAppNumber($event)" (blur)="leadForm.get('whatsappNumber')?.markAsTouched()">
+        <input type="tel" formControlName="whatsappNumber" class="form-input english-input whatsapp-number-input" placeholder="رقم الهاتف بدون رمز الدولة" dir="ltr" (input)="formatWhatsAppNumber($event)" (blur)="leadForm.get('whatsappNumber')?.markAsTouched()">
       </div>
       <div class="form-note">الرقم الكامل: <span dir="ltr">{{ getFormattedWhatsAppDisplay() }}</span></div>
       <div *ngIf="hasFieldErrors('whatsappNumber')" class="error-message">
@@ -255,14 +255,14 @@
       <!-- Header -->
       <div class="p-6 border-b border-gray-200">
         <div class="flex items-center justify-between">
-          <h3 class="text-2xl font-bold text-gray-800">تأكيد البيانات</h3>
+          <h3 class="text-2xl font-bold text-gray-800">يرجى مراجعة البيانات قبل الإرسال</h3>
           <button (click)="closeVerificationPage()" class="text-gray-400 hover:text-gray-600">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
           </button>
         </div>
-        <p class="text-gray-600 mt-2">يرجى مراجعة البيانات قبل الإرسال</p>
+        <!-- <p class="text-gray-600 mt-2">يرجى مراجعة البيانات قبل الإرسال</p> -->
       </div>
       
       <!-- Content -->
@@ -274,17 +274,17 @@
             <div class="space-y-2">
               <p><span class="font-medium">الاسم:</span> {{ leadForm.get('name')?.value || 'غير محدد' }}</p>
               <p><span class="font-medium">البريد الإلكتروني:</span> {{ leadForm.get('email')?.value || 'غير محدد' }}</p>
-              <p><span class="font-medium">رقم الهاتف:</span> {{ leadForm.get('phone')?.value || 'غير محدد' }}</p>
-              <p><span class="font-medium">الولاية:</span> {{ leadForm.get('state')?.value || 'غير محدد' }}</p>
+              <p><span class="font-medium">رقم الهاتف:</span> <span dir="ltr">+1 {{ leadForm.get('phone')?.value || 'غير محدد' }}</span></p>
+              <!-- <p><span class="font-medium">الولاية:</span> {{ leadForm.get('state')?.value || 'غير محدد' }}</p> -->
             </div>
           </div>
 
           <!-- WhatsApp Information -->
-          <div class="bg-gray-50 p-4 rounded-lg">
+          <div class="bg-gray-50 p-4 rounded-lg" *ngIf="leadForm.get('whatsappSame')?.value === 'no'">
             <h4 class="font-semibold text-gray-800 mb-3">معلومات الواتساب</h4>
             <div class="space-y-2">
-              <p><span class="font-medium">نفس رقم الهاتف:</span> {{ leadForm.get('whatsappSame')?.value === 'yes' ? 'نعم' : 'لا' }}</p>
-              <p *ngIf="leadForm.get('whatsappSame')?.value === 'no'"><span class="font-medium">رقم الواتساب:</span> {{ getFullWhatsAppNumber() }}</p>
+              <!-- <p><span class="font-medium">نفس رقم الهاتف:</span> {{ leadForm.get('whatsappSame')?.value === 'yes' ? 'نعم' : 'لا' }}</p> -->
+              <p *ngIf="leadForm.get('whatsappSame')?.value === 'no'"><span class="font-medium">رقم الواتساب:</span> <span dir="ltr">{{ getFullWhatsAppNumber() }}</span></p>
             </div>
           </div>
 
@@ -292,22 +292,22 @@
           <div class="bg-gray-50 p-4 rounded-lg">
             <h4 class="font-semibold text-gray-800 mb-3">معلومات التعلم</h4>
             <div class="space-y-2">
-              <p><span class="font-medium">تاريخ دروس الإنجليزية:</span> {{ leadForm.get('englishLessonsHistory')?.value || 'غير محدد' }}</p>
-              <p><span class="font-medium">المستوى المفضل:</span> {{ leadForm.get('levelPreference')?.value || 'غير محدد' }}</p>
+              <!-- <p><span class="font-medium">تاريخ دروس الإنجليزية:</span> {{ leadForm.get('englishLessonsHistory')?.value || 'غير محدد' }}</p> -->
+              <!-- <p><span class="font-medium">المستوى المفضل:</span> {{ leadForm.get('levelPreference')?.value || 'غير محدد' }}</p> -->
               <p><span class="font-medium">أفضل وقت للتواصل:</span> {{ leadForm.get('availability')?.value || 'غير محدد' }}</p>
               <p *ngIf="leadForm.get('availability')?.value === 'specific'"><span class="font-medium">الوقت المحدد:</span> {{ leadForm.get('specificTimeSlot')?.value || 'غير محدد' }}</p>
             </div>
           </div>
 
           <!-- Campaign Information -->
-          <div class="bg-gray-50 p-4 rounded-lg" *ngIf="leadForm.get('campaignName')?.value">
+          <!-- <div class="bg-gray-50 p-4 rounded-lg" *ngIf="leadForm.get('campaignName')?.value">
             <h4 class="font-semibold text-gray-800 mb-3">معلومات الحملة</h4>
             <div class="space-y-2">
               <p><span class="font-medium">اسم الحملة:</span> {{ leadForm.get('campaignName')?.value || 'غير محدد' }}</p>
               <p><span class="font-medium">اسم المجموعة:</span> {{ leadForm.get('adsetName')?.value || 'غير محدد' }}</p>
               <p><span class="font-medium">اسم الإعلان:</span> {{ leadForm.get('adName')?.value || 'غير محدد' }}</p>
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
       

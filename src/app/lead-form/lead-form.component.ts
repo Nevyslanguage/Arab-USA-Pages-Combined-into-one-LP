@@ -586,7 +586,7 @@ export class LeadFormComponent implements OnInit {
   getFullWhatsAppNumber(): string {
     const countryCode = this.selectedCountryCode;
     const number = this.leadForm.get('whatsappNumber')?.value || '';
-    return countryCode + number;
+    return countryCode + ' ' + number;
   }
 
   // Get formatted WhatsApp number for display
@@ -596,7 +596,7 @@ export class LeadFormComponent implements OnInit {
     if (!number) {
       return 'رقم الهاتف';
     }
-    return countryCode + number;
+    return countryCode + ' ' + number;
   }
 
   // Format phone number for submission (ensure it's in +1 (xxx) xxx-xxxx format)

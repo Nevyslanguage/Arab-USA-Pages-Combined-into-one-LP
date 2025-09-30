@@ -2,16 +2,16 @@
 <div class="min-h-screen" dir="rtl">
 
   <!-- Sticky Header with Reminder (shown on scroll, hidden at form) -->
-  <div class="fixed top-0 left-0 right-0 z-40 bg-white shadow-lg border-b-2 border-blue-200 transition-all duration-300 transform" 
+  <div class="fixed top-0 left-0 right-0 z-40 shadow-lg border-b-2 border-blue-200 transition-all duration-300 transform" 
        [class.translate-y-0]="showStickyHeader" 
-       [class.-translate-y-full]="!showStickyHeader">
+       [class.-translate-y-full]="!showStickyHeader" style="background-color: #8b0000;">
     <div class="max-w-6xl mx-auto px-4 py-3">
       <div class="text-center">
         <!-- Reminder Text - Visible on all devices -->
         <div class="text-center">
-          <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-1">تأكيد أو إلغاء الموعد</h2>
+          <h2 class="text-lg md:text-xl font-bold text-white mb-1">تأكيد أو إلغاء الموعد</h2>
           <p class="text-sm md:text-base font-medium text-blue-800 bg-blue-50 px-4 py-2 rounded-lg inline-block">
-            ⏰ أسفل الصفحة
+            أسفل الصفحة
           </p>
         </div>
       </div>
@@ -285,24 +285,23 @@
   <section id="form-section" class="py-14 px-4">
     <div class="max-w-4xl mx-auto">
       <!-- Red Warning Banner with Text -->
-      <div class="text-white p-4 rounded-lg mb-6 shadow-lg" style="background-color: #a40000;">
-        <div class="flex items-center space-x-3 space-x-reverse mb-3">
-          <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+      <div class="text-white p-4 rounded-lg mb-6 shadow-lg py-[50px] text-center" style="background-color: #a40000; text-align: center !important;">
+        <div class="flex items-center justify-center mb-3">
+          <svg class="w-9 h-9 text-white mb-5" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
           </svg>
-          <h3 class="text-lg font-bold">تنبيه</h3>
+          <h3 class="text-lg font-bold mb-8" style="font-size: 50px !important;">مهم</h3>
         </div>
         <div class="p-3 rounded border" style="background-color: #8b0000; border-color: #660000;">
-          <p class="text-sm leading-relaxed">
-            ⏰ لا تنسى تأكيد أو إلغاء موعدك
-          </p>
+          <p class="text-sm leading-relaxed" style="font-size: 27px;">
+            ⏰  تأكيد أو إلغاء الموعد هنا </p>
         </div>
       </div>
       
       <!-- Confirmation Form -->
-      <div class="bg-white bg-opacity-90 border-2 border-gray-200 rounded-lg p-2 shadow-lg">
+      <div class="bg-white bg-opacity-90 border-2 border-gray-200 rounded-lg p-2 shadow-lg py-4">
         <h3 class="text-2xl md:text-3xl font-bold text-gray-800 text-center mb-8">
-          تأكيد أو إلغاء الموعد هنا
+          اختر ردك 
         </h3>
         
         <form class="space-y-6">
