@@ -1,0 +1,327 @@
+<div class="lead-form-container">
+  <!-- Header with Logo -->
+  <div class="header pt-10">
+    <img src="assets/images/NevysLogo_Digital-02.png" alt="NEVY'S LANGUAGE" class="logo">
+  </div>
+
+  <!-- Introduction Text -->
+  <div class="intro-text">
+    <h2 class="main-description">
+      منذ 2017 ونحن نصنع فرقًا حقيقيًا في حياة آلاف الأشخاص حول العالم، نساعدهم على تعلم الإنجليزية بثقة ومتعة 🌍✨ مقرنا في تورنتو، وساعدنا أكثر من 5000 متعلم من الولايات المتحدة وكندا ودول عديدة، في مجموعات تفاعلية مليئة بالحماس والدعم.
+    </h2>
+    <p class="instruction-text my-4">
+      يرجى ملء هذا النموذج حتى يتمكن وكلاء التسجيل لدينا من الاتصال بك وتزويدك بكل المعلومات التي تحتاجها.
+    </p>
+  </div>
+
+  <!-- Lead Form -->
+  <form class="lead-form" [formGroup]="leadForm" (ngSubmit)="onSubmit()">
+    
+    <!-- English Lessons History -->
+    <div class="form-group">
+      <label class="form-label">هل سبق لك أن أخذت دروس في اللغة الإنجليزية من قبل؟*</label>
+      <div class="radio-group" [class.ng-invalid]="leadForm.get('englishLessonsHistory')?.invalid" [class.ng-touched]="leadForm.get('englishLessonsHistory')?.touched">
+        <label class="radio-label">
+          <input type="radio" formControlName="englishLessonsHistory" value="yes" class="radio-input" (change)="leadForm.get('englishLessonsHistory')?.markAsTouched()">
+          <span class="radio-text">نعم</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" formControlName="englishLessonsHistory" value="no" class="radio-input" (change)="leadForm.get('englishLessonsHistory')?.markAsTouched()">
+          <span class="radio-text">لا</span>
+        </label>
+      </div>
+      <div *ngIf="hasFieldErrors('englishLessonsHistory')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('englishLessonsHistory')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- Level Assessment Preference -->
+    <div class="form-group">
+      <label class="form-label">هل تفضل أن تأخذ اختباراً لتحديد مستواك، أم تريد أن تبدأ التعلم من الصفر بسهولة؟*</label>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" formControlName="levelPreference" value="test" class="radio-input" (change)="leadForm.get('levelPreference')?.markAsTouched()">
+          <span class="radio-text">أريد أن أختبر مستواي</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" formControlName="levelPreference" value="beginner" class="radio-input" (change)="leadForm.get('levelPreference')?.markAsTouched()">
+          <span class="radio-text">أريد أن أبدأ من الصفر</span>
+        </label>
+      </div>
+      <div *ngIf="hasFieldErrors('levelPreference')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('levelPreference')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- Availability -->
+    <div class="form-group">
+      <label class="form-label">في أي وقت تكون متاحًا؟*</label>
+      <div class="radio-group availability-group">
+        <label class="radio-label">
+          <input type="radio" formControlName="availability" value="9am-11am" class="radio-input" (change)="leadForm.get('availability')?.markAsTouched()">
+          <span class="radio-text">صباحًا 11 - 9</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" formControlName="availability" value="11am-2pm" class="radio-input" (change)="leadForm.get('availability')?.markAsTouched()">
+          <span class="radio-text">ظهرا 2 - 11</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" formControlName="availability" value="2pm-5pm" class="radio-input" (change)="leadForm.get('availability')?.markAsTouched()">
+          <span class="radio-text">مساءً 5 - 2</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" formControlName="availability" value="5pm-9pm" class="radio-input" (change)="leadForm.get('availability')?.markAsTouched()">
+          <span class="radio-text">مساءً 9 - 5</span>
+        </label>
+      </div>
+      <div *ngIf="hasFieldErrors('availability')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('availability')">{{ error }}</span>
+      </div>
+    </div>
+    <!-- Specific Time Slots -->
+    <div class="form-group" *ngIf="selectedTimeSlots.length > 0">
+      <label class="form-label">لكي نتمكن من الاتصال بك في أفضل وقت، يرجى اختيار فترة زمنية محددة ضمن النطاق الذي اخترته: *</label>
+      <div class="radio-group specific-time-slots">
+        <label class="radio-label" *ngFor="let slot of selectedTimeSlots">
+          <input type="radio" formControlName="specificTimeSlot" [value]="slot.value" class="radio-input" dir="rtl" (change)="leadForm.get('specificTimeSlot')?.markAsTouched()">
+          <span class="radio-text" [innerHTML]="slot.label"></span>
+        </label>
+      </div>
+      <div *ngIf="hasFieldErrors('specificTimeSlot')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('specificTimeSlot')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- Name Input -->
+    <div class="form-group">
+      <label class="form-label">اسمك*</label>
+      <input type="text" formControlName="name" class="form-input english-input" dir="ltr" required (blur)="leadForm.get('name')?.markAsTouched()">
+      <div *ngIf="hasFieldErrors('name')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('name')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- Phone Number -->
+    <div class="form-group">
+      <label class="form-label">رقم هاتفك الأمريكي (احذر من ارتكاب أي خطأ!) ⚠️*</label>
+      <div class="phone-input-container" [class.ng-invalid]="leadForm.get('phone')?.invalid" [class.ng-touched]="leadForm.get('phone')?.touched">
+        <div class="phone-prefix">
+          <span class="flag">🇺🇸</span>
+          <span class="country-code">+1</span>
+        </div>
+        <input type="tel" formControlName="phone" class="form-input english-input phone-number-input" placeholder="(xxx) xxx-xxxx" (input)="formatPhoneNumber($event)" (blur)="leadForm.get('phone')?.markAsTouched()">
+      </div>
+      <div class="form-note">يرجى إدخال رقم هاتف أمريكي صحيح (10 أرقام) - سيتم إرساله بالتنسيق: +1 (xxx) xxx-xxxx</div>
+      <div *ngIf="hasFieldErrors('phone')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('phone')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- WhatsApp Confirmation -->
+    <div class="form-group">
+      <label class="form-label">هل رقم هاتفك هو نفسه رقمك على واتساب ؟*</label>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" formControlName="whatsappSame" value="yes" class="radio-input" (change)="leadForm.get('whatsappSame')?.markAsTouched()">
+          <span class="radio-text">نعم</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" formControlName="whatsappSame" value="no" class="radio-input" (change)="leadForm.get('whatsappSame')?.markAsTouched()">
+          <span class="radio-text">لا</span>
+        </label>
+      </div>
+      <div *ngIf="hasFieldErrors('whatsappSame')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('whatsappSame')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- WhatsApp Number Input (conditional) -->
+    <div class="form-group" *ngIf="leadForm.get('whatsappSame')?.value === 'no'">
+      <label class="form-label">يرجى إدخال رقم واتساب الخاص بك*</label>
+      <div class="whatsapp-input-container" [class.ng-invalid]="leadForm.get('whatsappNumber')?.invalid" [class.ng-touched]="leadForm.get('whatsappNumber')?.touched">
+        <div class="whatsapp-prefix-container">
+          <div class="whatsapp-prefix" (click)="toggleCountryDropdown()">
+            <span class="flag">{{ getSelectedCountryFlag() }}</span>
+            <span class="country-code">{{ selectedCountryCode }}</span>
+            <span class="dropdown-arrow">▼</span>
+          </div>
+          <div class="country-dropdown" *ngIf="showCountryDropdown">
+            <div class="country-search-container">
+              <input type="text" 
+                     class="country-search-input" 
+                     placeholder="البحث عن الدول..." 
+                     [(ngModel)]="countrySearchTerm"
+                     [ngModelOptions]="{standalone: true}"
+                     (input)="onCountrySearch($event)"
+                     (keyup)="onCountrySearch($event)"
+                     (paste)="onCountrySearch($event)"
+                     (click)="$event.stopPropagation()">
+              <button type="button" 
+                      class="clear-search-btn" 
+                      *ngIf="countrySearchTerm"
+                      (click)="onSearchClear()"
+                      (click)="$event.stopPropagation()">
+                ✕
+              </button>
+            </div>
+            <div class="country-options-container">
+              <div class="country-option" *ngFor="let country of filteredCountries" (click)="selectCountry(country)">
+                <span class="flag">{{ country.flag }}</span>
+                <span class="country-code">{{ country.code }}</span>
+                <span class="country-name">{{ country.country }}</span>
+              </div>
+              <div class="no-results" *ngIf="filteredCountries.length === 0 && countrySearchTerm">
+                <span>لم يتم العثور على دول لـ "{{ countrySearchTerm }}"</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <input type="tel" formControlName="whatsappNumber" class="form-input english-input whatsapp-number-input" placeholder="رقم الهاتف بدون رمز الدولة" (input)="formatWhatsAppNumber($event)" (blur)="leadForm.get('whatsappNumber')?.markAsTouched()">
+      </div>
+      <div class="form-note">الرقم الكامل: <span dir="ltr">{{ getFormattedWhatsAppDisplay() }}</span></div>
+      <div *ngIf="hasFieldErrors('whatsappNumber')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('whatsappNumber')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- Email Address -->
+    <div class="form-group">
+      <label class="form-label">عنوان البريد الإلكتروني*</label>
+      <input type="email" formControlName="email" class="form-input english-input" placeholder="example@email.com" dir="ltr" (blur)="formatEmail($event); leadForm.get('email')?.markAsTouched()" required>
+      <div class="form-note">إذا لم نتمكن من الوصول إليك عبر الهاتف، سنحاول الاتصال بك عبر البريد الإلكتروني.</div>
+      <div *ngIf="hasFieldErrors('email')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('email')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- State -->
+    <div class="form-group">
+      <p class="province-intro">نود أن نعرف من أين يأتي طلابنا المحتملون 😊</p>
+      <label class="form-label">الولاية*</label>
+      <div class="state-dropdown-container" [class.ng-invalid]="leadForm.get('state')?.invalid" [class.ng-touched]="leadForm.get('state')?.touched">
+        <div class="state-select-display" (click)="toggleStateDropdown()">
+          <span class="state-display-text">{{ getSelectedStateDisplay() }}</span>
+          <span class="dropdown-arrow">▼</span>
+        </div>
+        <div class="state-dropdown" *ngIf="showStateDropdown">
+          <div class="state-search-container">
+            <input type="text" 
+                   class="state-search-input" 
+                   placeholder="البحث عن الولاية..." 
+                   [(ngModel)]="stateSearchTerm"
+                   [ngModelOptions]="{standalone: true}"
+                   (input)="onStateSearch($event)"
+                   (keyup)="onStateSearch($event)"
+                   (paste)="onStateSearch($event)"
+                   (click)="$event.stopPropagation()">
+            <button type="button" 
+                    class="clear-search-btn" 
+                    *ngIf="stateSearchTerm"
+                    (click)="onStateSearchClear()"
+                    (click)="$event.stopPropagation()">
+              ✕
+            </button>
+          </div>
+          <div class="state-options-container">
+            <div class="state-option" *ngFor="let state of filteredStates" (click)="selectState(state)">
+              <span class="state-name">{{ state.label }}</span>
+            </div>
+            <div class="no-results" *ngIf="filteredStates.length === 0 && stateSearchTerm">
+              <span>لم يتم العثور على ولايات لـ "{{ stateSearchTerm }}"</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="hasFieldErrors('state')" class="error-message">
+        <span *ngFor="let error of getFieldErrors('state')">{{ error }}</span>
+      </div>
+    </div>
+
+    <!-- Hidden Campaign Tracking Fields (auto-populated from URL) -->
+    <input type="hidden" formControlName="campaignName">
+    <input type="hidden" formControlName="adsetName">
+    <input type="hidden" formControlName="adName">
+    <input type="hidden" formControlName="fbClickId">
+
+    <!-- Submit Button -->
+    <button type="submit" class="submit-button" [class.submit-button-valid]="isFormValid()" [disabled]="leadForm.invalid">
+      إرسال النموذج
+    </button>
+  </form>
+
+  <!-- Verification Page -->
+  <div *ngIf="showVerificationPage" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" (click)="closeVerificationPage()">
+    <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+      <!-- Header -->
+      <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-2xl font-bold text-gray-800">تأكيد البيانات</h3>
+          <button (click)="closeVerificationPage()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <p class="text-gray-600 mt-2">يرجى مراجعة البيانات قبل الإرسال</p>
+      </div>
+      
+      <!-- Content -->
+      <div class="p-6">
+        <div class="space-y-4">
+          <!-- Personal Information -->
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-semibold text-gray-800 mb-3">المعلومات الشخصية</h4>
+            <div class="space-y-2">
+              <p><span class="font-medium">الاسم:</span> {{ leadForm.get('name')?.value || 'غير محدد' }}</p>
+              <p><span class="font-medium">البريد الإلكتروني:</span> {{ leadForm.get('email')?.value || 'غير محدد' }}</p>
+              <p><span class="font-medium">رقم الهاتف:</span> {{ leadForm.get('phone')?.value || 'غير محدد' }}</p>
+              <p><span class="font-medium">الولاية:</span> {{ leadForm.get('state')?.value || 'غير محدد' }}</p>
+            </div>
+          </div>
+
+          <!-- WhatsApp Information -->
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-semibold text-gray-800 mb-3">معلومات الواتساب</h4>
+            <div class="space-y-2">
+              <p><span class="font-medium">نفس رقم الهاتف:</span> {{ leadForm.get('whatsappSame')?.value === 'yes' ? 'نعم' : 'لا' }}</p>
+              <p *ngIf="leadForm.get('whatsappSame')?.value === 'no'"><span class="font-medium">رقم الواتساب:</span> {{ getFullWhatsAppNumber() }}</p>
+            </div>
+          </div>
+
+          <!-- Learning Information -->
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-semibold text-gray-800 mb-3">معلومات التعلم</h4>
+            <div class="space-y-2">
+              <p><span class="font-medium">تاريخ دروس الإنجليزية:</span> {{ leadForm.get('englishLessonsHistory')?.value || 'غير محدد' }}</p>
+              <p><span class="font-medium">المستوى المفضل:</span> {{ leadForm.get('levelPreference')?.value || 'غير محدد' }}</p>
+              <p><span class="font-medium">أفضل وقت للتواصل:</span> {{ leadForm.get('availability')?.value || 'غير محدد' }}</p>
+              <p *ngIf="leadForm.get('availability')?.value === 'specific'"><span class="font-medium">الوقت المحدد:</span> {{ leadForm.get('specificTimeSlot')?.value || 'غير محدد' }}</p>
+            </div>
+          </div>
+
+          <!-- Campaign Information -->
+          <div class="bg-gray-50 p-4 rounded-lg" *ngIf="leadForm.get('campaignName')?.value">
+            <h4 class="font-semibold text-gray-800 mb-3">معلومات الحملة</h4>
+            <div class="space-y-2">
+              <p><span class="font-medium">اسم الحملة:</span> {{ leadForm.get('campaignName')?.value || 'غير محدد' }}</p>
+              <p><span class="font-medium">اسم المجموعة:</span> {{ leadForm.get('adsetName')?.value || 'غير محدد' }}</p>
+              <p><span class="font-medium">اسم الإعلان:</span> {{ leadForm.get('adName')?.value || 'غير محدد' }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="p-6 border-t border-gray-200 flex space-x-3 space-x-reverse">
+        <button (click)="editForm()" 
+                class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
+          تعديل البيانات
+        </button>
+        <button (click)="confirmSubmission()" 
+                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200">
+          تأكيد الإرسال
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

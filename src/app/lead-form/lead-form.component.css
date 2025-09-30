@@ -1,0 +1,956 @@
+html, body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: 100%;
+  touch-action: pan-y;
+  scroll-behavior: smooth;
+}
+
+.lead-form-container {
+  background-color: rgba(3, 90, 126, 1);
+  min-height: 100vh;
+  padding: 20px;
+  font-family: 'Noto Sans Arabic', 'Arial', sans-serif;
+  direction: rtl;
+  text-align: right;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo {
+  height: auto;
+  filter: brightness(0) invert(1);
+  display: block;
+  margin: 0 auto;
+}
+
+.intro-text {
+  color: white;
+  margin-bottom: 40px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.main-description {
+  font-size: 20px !important;
+  line-height: 50px;
+  text-align: center;
+  font-weight: 400;
+  margin: 10px 10px !important;
+}
+
+.instruction-text {
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Form Styles */
+.lead-form {
+  max-width: 600px;
+  margin: 0 auto;
+  background-color: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: visible;
+}
+
+.form-group {
+  margin-bottom: 25px;
+}
+
+.form-label {
+  display: block;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-align: right;
+  direction: rtl;
+}
+
+/* Override for English labels */
+.form-label.english-label {
+  text-align: left !important;
+  direction: ltr;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: white;
+  font-size: 16px;
+  color: #333;
+  direction: rtl;
+  text-align: right;
+  box-sizing: border-box;
+  margin-top: 5px;
+}
+
+/* Override for English inputs */
+.form-input.english-input {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #2587b8;
+  background-color: white;
+  box-shadow: 0 0 0 1px rgba(37, 135, 184, 0.2);
+}
+
+.form-input.ng-invalid.ng-touched {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.2);
+}
+
+.form-input::placeholder {
+  color: #666;
+  text-align: right;
+  direction: rtl;
+}
+
+/* Override for specific English-only placeholders */
+input[placeholder*="(xxx)"]::placeholder,
+input[placeholder*="example@"]::placeholder {
+  text-align: left !important;
+  direction: ltr !important;
+}
+
+/* Radio Button Styles */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 10px;
+}
+
+.availability-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Specific Time Slots */
+.specific-time-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.specific-time-slots .radio-label {
+  margin-bottom: 0;
+  padding: 10px 12px;
+  font-size: 15px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #333;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 12px 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  margin-bottom: 8px;
+  transition: background-color 0.3s ease;
+  direction: ltr;
+}
+
+.radio-label:hover {
+  background-color: #e9ecef;
+}
+
+.radio-label:has(.radio-input:checked) {
+  background-color: rgba(3, 90, 126, 1);
+  color: white;
+}
+
+.radio-label:has(.radio-input:checked) .radio-text {
+  color: white;
+}
+
+.radio-input {
+  margin-left: 0;
+  margin-right: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: #2587b8;
+  order: 2;
+}
+
+.radio-text {
+  text-align: left;
+  flex: 1;
+  font-weight: 500;
+  order: 1;
+}
+
+/* Radio group validation styling */
+.radio-group.ng-invalid.ng-touched .radio-label {
+  border-color: #dc3545;
+  background-color: #fff5f5;
+}
+
+/* Form Note */
+.form-note {
+  color: #666;
+  font-size: 14px;
+  margin-top: 5px;
+  font-style: italic;
+}
+
+/* Province Intro Text */
+.province-intro {
+  color: #333;
+  font-size: 16px;
+  margin-bottom: 15px;
+  text-align: right;
+  direction: rtl;
+  font-weight: 500;
+}
+
+/* Custom State Dropdown Styling */
+.state-dropdown-container {
+  position: relative;
+  width: 100%;
+  margin-top: 5px;
+}
+
+.state-select-display {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  font-size: 17px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  min-height: 50px;
+  box-sizing: border-box;
+}
+
+.state-select-display:hover {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-color: #035a7e;
+  box-shadow: 0 6px 16px rgba(3, 90, 126, 0.15);
+  transform: translateY(-1px);
+}
+
+.state-display-text {
+  flex: 1;
+  text-align: left;
+  direction: ltr;
+}
+
+.dropdown-arrow {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.3s ease;
+}
+
+.state-dropdown-container:hover .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.state-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #035a7e;
+  border-radius: 12px;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 300px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.state-search-container {
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  position: relative;
+}
+
+.state-search-input {
+  width: 100%;
+  padding: 10px 35px 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  direction: rtl;
+  text-align: right;
+  box-sizing: border-box;
+}
+
+.state-search-input:focus {
+  outline: none;
+  border-color: #035a7e;
+  box-shadow: 0 0 0 2px rgba(3, 90, 126, 0.2);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-search-btn:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.state-options-container {
+  max-height: 240px;
+  overflow-y: auto;
+  background: white;
+}
+
+.state-option {
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.state-option:hover {
+  background: linear-gradient(135deg, #035a7e 0%, #024a6b 100%);
+  color: white;
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(3, 90, 126, 0.3);
+}
+
+.state-option:last-child {
+  border-bottom: none;
+}
+
+.state-name {
+  flex: 1;
+  direction: ltr;
+  text-align: left;
+}
+
+.no-results {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  background: #f8f9fa;
+}
+
+/* Custom scrollbar for state options */
+.state-options-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.state-options-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.state-options-container::-webkit-scrollbar-thumb {
+  background: #035a7e;
+  border-radius: 4px;
+}
+
+.state-options-container::-webkit-scrollbar-thumb:hover {
+  background: #024a6b;
+}
+
+/* Invalid state styling */
+.state-dropdown-container.ng-invalid.ng-touched .state-select-display {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+/* Phone Input Container */
+.phone-input-container {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: white;
+  overflow: hidden;
+}
+
+.phone-prefix {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: #f8f9fa;
+  border-right: 1px solid #e0e0e0;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.phone-prefix .flag {
+  font-size: 18px;
+}
+
+.phone-prefix .country-code {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.phone-number-input {
+  border: none !important;
+  border-radius: 0 !important;
+  margin-top: 0 !important;
+  flex: 1;
+}
+
+.phone-number-input:focus {
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.phone-input-container:focus-within {
+  border-color: #2587b8;
+  box-shadow: 0 0 0 1px rgba(37, 135, 184, 0.2);
+}
+
+.phone-input-container.ng-invalid.ng-touched {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.2);
+}
+
+/* WhatsApp Input Container */
+.whatsapp-input-container {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: white;
+  overflow: visible;
+  position: relative;
+  min-height: 48px;
+}
+
+.whatsapp-prefix-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 80px;
+}
+
+.whatsapp-prefix {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: #f8f9fa;
+  border-right: 1px solid #e0e0e0;
+  gap: 8px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  height: 100%;
+  min-height: 48px;
+}
+
+.whatsapp-prefix:hover {
+  background-color: #e9ecef;
+}
+
+.whatsapp-prefix .flag {
+  font-size: 18px;
+}
+
+.whatsapp-prefix .country-code {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.whatsapp-prefix .dropdown-arrow {
+  font-size: 12px;
+  color: #666;
+  margin-left: 4px;
+  transition: transform 0.2s ease;
+}
+
+.whatsapp-prefix:hover .dropdown-arrow {
+  color: #333;
+}
+
+.whatsapp-number-input {
+  border: none !important;
+  border-radius: 0 !important;
+  margin-top: 0 !important;
+  flex: 1;
+  height: 48px;
+  padding: 12px 15px;
+}
+
+.whatsapp-number-input:focus {
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Country Dropdown */
+.country-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 250px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 300px;
+  z-index: 9999;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Country Search Container */
+.country-search-container {
+  padding: 10px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
+  border-radius: 8px 8px 0 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.country-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: white;
+  outline: none;
+  box-sizing: border-box;
+  direction: ltr;
+  text-align: left;
+}
+
+.country-search-input:focus {
+  border-color: #2587b8;
+  box-shadow: 0 0 0 1px rgba(37, 135, 184, 0.2);
+}
+
+.country-search-input::placeholder {
+  color: #999;
+  text-align: left;
+  direction: ltr;
+}
+
+/* Clear Search Button */
+.clear-search-btn {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background-color: #f0f0f0;
+  color: #666;
+}
+
+/* Country Options Container */
+.country-options-container {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.country-option {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  gap: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.country-option:last-child {
+  border-bottom: none;
+}
+
+.country-option:hover {
+  background-color: #f8f9fa;
+}
+
+.country-option .flag {
+  font-size: 18px;
+  min-width: 25px;
+  text-align: center;
+}
+
+.country-option .country-code {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  min-width: 50px;
+  text-align: left;
+}
+
+.country-option .country-name {
+  font-size: 14px;
+  color: #666;
+  flex: 1;
+  text-align: left;
+}
+
+/* No Results Message */
+.no-results {
+  padding: 20px 15px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.whatsapp-input-container:focus-within {
+  border-color: #2587b8;
+  box-shadow: 0 0 0 1px rgba(37, 135, 184, 0.2);
+}
+
+.whatsapp-input-container.ng-invalid.ng-touched {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.2);
+}
+
+/* Error Messages */
+.error-message {
+  color: #dc3545;
+  font-size: 14px;
+  margin-top: 8px;
+  font-weight: 500;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  padding: 8px 12px;
+  direction: rtl;
+  text-align: right;
+}
+
+.error-message span {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.error-message span:last-child {
+  margin-bottom: 0;
+}
+
+/* Form Separators */
+.form-group:not(:last-child) {
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+}
+
+.form-group:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+/* Submit Button */
+.submit-button {
+  width: 100%;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  font-size: 18px;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 20px;
+  font-family: 'Noto Sans Arabic', 'Arial', sans-serif;
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.submit-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Green submit button when form is valid */
+.submit-button-valid {
+  background-color: #28a745 !important;
+}
+
+.submit-button-valid:hover:not(:disabled) {
+  background-color: #218838 !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .lead-form-container {
+    padding: 15px;
+  }
+  
+  .logo {
+    max-width: 250px;
+  }
+  
+  .main-description {
+    font-size: 16px;
+  }
+  
+  .instruction-text {
+    font-size: 14px;
+  }
+  
+  .lead-form {
+    padding: 20px;
+  }
+  
+  .availability-group {
+    grid-template-columns: 1fr;
+  }
+  
+  .specific-time-slots {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+  
+  .specific-time-slots .radio-label {
+    font-size: 14px;
+    padding: 8px 10px;
+    min-height: 45px;
+  }
+  
+  .form-label {
+    font-size: 15px;
+  }
+  
+  .form-input {
+    font-size: 15px;
+  }
+  
+  .radio-text {
+    font-size: 15px;
+  }
+  
+  .phone-prefix {
+    padding: 10px 12px;
+  }
+  
+  .phone-prefix .flag {
+    font-size: 16px;
+  }
+  
+  .phone-prefix .country-code {
+    font-size: 14px;
+  }
+  
+  .whatsapp-prefix-container {
+    min-width: 70px;
+  }
+  
+  .whatsapp-prefix {
+    padding: 10px 12px;
+    min-height: 45px;
+  }
+  
+  .whatsapp-prefix .flag {
+    font-size: 16px;
+  }
+  
+  .whatsapp-prefix .country-code {
+    font-size: 14px;
+  }
+  
+  .country-dropdown {
+    max-height: 250px;
+    width: 200px;
+    right: 0;
+  }
+  
+  .country-options-container {
+    max-height: 150px;
+  }
+  
+  .country-option {
+    padding: 10px 12px;
+  }
+  
+  .country-option .flag {
+    font-size: 14px;
+  }
+  
+  .country-option .country-code {
+    font-size: 13px;
+  }
+  
+  .country-option .country-name {
+    font-size: 13px;
+  }
+  
+  .whatsapp-number-input {
+    height: 45px;
+    padding: 10px 12px;
+  }
+  
+  .clear-search-btn {
+    right: 15px;
+    font-size: 14px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .lead-form-container {
+    padding: 10px;
+  }
+  
+  .logo {
+    max-width: 200px;
+  }
+  
+  .lead-form {
+    padding: 15px;
+  }
+  
+  .main-description {
+    font-size: 15px;
+  }
+  
+  .instruction-text {
+    font-size: 13px;
+  }
+  
+  .phone-prefix {
+    padding: 8px 10px;
+  }
+  
+  .phone-prefix .flag {
+    font-size: 14px;
+  }
+  
+  .phone-prefix .country-code {
+    font-size: 13px;
+  }
+  
+  .whatsapp-prefix-container {
+    min-width: 60px;
+  }
+  
+  .whatsapp-prefix {
+    padding: 8px 10px;
+    min-height: 40px;
+  }
+  
+  .whatsapp-prefix .flag {
+    font-size: 14px;
+  }
+  
+  .whatsapp-prefix .country-code {
+    font-size: 13px;
+  }
+  
+  .country-dropdown {
+    max-height: 200px;
+    width: 180px;
+    right: 0;
+  }
+  
+  .country-options-container {
+    max-height: 120px;
+  }
+  
+  .country-option {
+    padding: 8px 10px;
+  }
+  
+  .country-option .flag {
+    font-size: 12px;
+  }
+  
+  .country-option .country-code {
+    font-size: 12px;
+  }
+  
+  .country-option .country-name {
+    font-size: 12px;
+  }
+  
+  .whatsapp-number-input {
+    height: 40px;
+    padding: 8px 10px;
+  }
+  
+  .clear-search-btn {
+    right: 12px;
+    font-size: 12px;
+    width: 16px;
+    height: 16px;
+  }
+}
