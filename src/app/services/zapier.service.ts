@@ -98,7 +98,16 @@ export class ZapierService {
       if (formData.pageUrl) params.set('page_url', formData.pageUrl);
       
       // Formatted description for Salesforce
-      params.set('description', this.formatFormDataForDescription(formData));
+      const description = this.formatFormDataForDescription(formData);
+      params.set('description', description);
+      params.set('notes', description); // Alternative field name
+      params.set('comments', description); // Alternative field name
+      
+      // Debug logging
+      console.log('=== ZAPIER DESCRIPTION DEBUG ===');
+      console.log('Description being sent:', description);
+      console.log('Description length:', description.length);
+      console.log('Full URL being sent:', `${this.ZAPIER_WEBHOOK_URL}?${params.toString()}`);
 
       // Send as GET request with query parameters
       const response = await this.http.get(`${this.ZAPIER_WEBHOOK_URL}?${params.toString()}`).toPromise();

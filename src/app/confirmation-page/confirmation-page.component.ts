@@ -574,6 +574,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       form_interaction_time: this.formStarted && this.formStartTime > 0 ? Math.round((Date.now() - this.formStartTime) / 1000) : 0
     };
 
+    // Add formatted description after the object is created
+    zapierData.description = this.formatConfirmationDescription(zapierData, events, appointmentStatus);
+
     // Console logging for debugging with better formatting
     console.log('📊 TRACKING DATA SENT:');
     console.log('Trigger:', trigger);
@@ -791,6 +794,74 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Send to Zapier (you'll need to replace the URL)
     this.sendToZapier(leadUpdateData);
+  }
+
+  private formatConfirmationDescription(data: any, events: any, appointmentStatus: string): string {
+    let description = `Confirmation Page Analytics - User Left Page\n\n`;
+    
+    // User response section
+    description += `User Response: ${data.confirmation_choice || 'No response'}\n`;
+    description += `Appointment Status: ${appointmentStatus}\n\n`;
+    
+    // Cancellation details if applicable
+    if (data.cancellation_reasons && data.cancellation_reasons !== 'None') {
+      description += `Cancellation Reasons: ${data.cancellation_reasons}\n`;
+    }
+    
+    if (data.subscription_preference) {
+      description += `Marketing Consent: ${data.subscription_preference}\n`;
+    }
+    
+    if (data.preferred_start_time) {
+      description += `Preferred Start Time: ${data.preferred_start_time}\n`;
+    }
+    
+    if (data.payment_access) {
+      description += `Payment Readiness: ${data.payment_access}\n`;
+    }
+    
+    // Session analytics
+    description += `\nSession Analytics:\n`;
+    description += `Session ID: ${data.session_id}\n`;
+    description += `Total Session Time: ${this.formatTime(data.total_session_time)}\n`;
+    description += `Form Started: ${data.form_started ? 'Yes' : 'No'}\n`;
+    description += `Form Submitted: ${data.form_submitted ? 'Yes' : 'No'}\n`;
+    
+    if (data.form_interaction_time > 0) {
+      description += `Form Interaction Time: ${this.formatTime(data.form_interaction_time)}\n`;
+    }
+    
+    // Section time analytics
+    description += `\nTime Spent on Sections:\n`;
+    Object.keys(events).forEach(key => {
+      if (key.includes('session_duration_on_') && events[key] > 0) {
+        const sectionName = key.replace('session_duration_on_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        description += `• ${sectionName}: ${this.formatTime(events[key])}\n`;
+      }
+    });
+    
+    if (events.session_idle_time_duration > 0) {
+      description += `• Idle Time: ${this.formatTime(events.session_idle_time_duration)}\n`;
+    }
+    
+    // Campaign data
+    if (data.campaign_name || data.adset_name || data.ad_name) {
+      description += `\nCampaign Tracking:\n`;
+      if (data.campaign_name) description += `Campaign: ${data.campaign_name}\n`;
+      if (data.adset_name) description += `Adset: ${data.adset_name}\n`;
+      if (data.ad_name) description += `Ad: ${data.ad_name}\n`;
+    }
+    
+    description += `\nTrigger: ${data.trigger}\n`;
+    description += `Submitted on: ${new Date().toLocaleString()}`;
+    
+    return description;
+  }
+
+  private formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
   private sendToHotjar(events: any) {
