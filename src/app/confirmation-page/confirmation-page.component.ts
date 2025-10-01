@@ -530,12 +530,15 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     const userChoice = this.userSelections.choice || this.selectedChoice;
     let appointmentStatus = ''; // Default for no response
     
-    if (userChoice === 'confirm') {
-      appointmentStatus = 'confirmed';
-    } else if (userChoice === 'cancel') {
-      appointmentStatus = 'cancelled';
+    // Only set appointment status if they actually completed the form
+    if (this.formSubmitted) {
+      if (userChoice === 'confirm') {
+        appointmentStatus = 'confirmed';
+      } else if (userChoice === 'cancel') {
+        appointmentStatus = 'cancelled';
+      }
     }
-    // If no choice or any other value, it remains 'no_response'
+    // If they started but didn't submit, appointment status remains empty
 
     // Prepare Zapier webhook data for lead update
     const zapierData = {
@@ -801,7 +804,34 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // User response section
     description += `User Response: ${data.confirmation_choice || 'No response'}\n`;
-    description += `Appointment Status: ${appointmentStatus}\n\n`;
+    description += `Appointment Status: ${appointmentStatus || 'Not set (user didn\'t complete form)'}\n\n`;
+    
+    // Show partial form data if they started but didn't complete
+    if (data.form_started && !data.form_submitted) {
+      description += `📝 PARTIAL FORM DATA (User started but didn't complete):\n`;
+      
+      if (data.cancellation_reasons && data.cancellation_reasons !== 'None') {
+        description += `• Cancellation Reasons Selected: ${data.cancellation_reasons}\n`;
+      }
+      
+      if (data.subscription_preference) {
+        description += `• Marketing Consent: ${data.subscription_preference}\n`;
+      }
+      
+      if (data.preferred_start_time) {
+        description += `• Preferred Start Time: ${data.preferred_start_time}\n`;
+      }
+      
+      if (data.payment_access) {
+        description += `• Payment Readiness: ${data.payment_access}\n`;
+      }
+      
+      if (data.other_reason) {
+        description += `• Other Reason Details: ${data.other_reason}\n`;
+      }
+      
+      description += `\n⚠️ This user showed interest by starting the form but didn't complete it\n\n`;
+    }
     
     // Cancellation details if applicable
     if (data.cancellation_reasons && data.cancellation_reasons !== 'None') {
