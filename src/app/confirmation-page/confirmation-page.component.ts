@@ -1256,6 +1256,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   proceedToWhatsApp() {
+    // Mark form as submitted when user completes the form
+    this.formSubmitted = true;
+    console.log('✅ Form submitted - User completed the form via proceedToWhatsApp');
+    
     // Debug: Log name before processing
     console.log('🔍 proceedToWhatsApp name debug:', {
       urlParamsName: this.urlParams.name,
