@@ -575,7 +575,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     };
 
     // Add formatted description after the object is created
-    zapierData.description = this.formatConfirmationDescription(zapierData, events, appointmentStatus);
+    (zapierData as any).description = this.formatConfirmationDescription(zapierData, events, appointmentStatus);
 
     // Console logging for debugging with better formatting
     console.log('📊 TRACKING DATA SENT:');
