@@ -587,8 +587,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     console.log('Events:', JSON.stringify(events, null, 2));
     console.log('Zapier Data:', JSON.stringify(zapierData, null, 2));
 
-    // Send to Zapier webhook
-    this.sendToZapier(zapierData);
+    // Send to Zapier webhook using ZapierService for proper description formatting
+    this.sendToZapierWithService(zapierData);
     
     // TODO: Send to Hotjar
     // this.sendToHotjar(events);
@@ -892,6 +892,50 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  private async sendToZapierWithService(zapierData: any) {
+    try {
+      // Convert the zapierData to the format expected by ZapierService
+      const formData = {
+        selectedResponse: zapierData.confirmation_choice || 'No response',
+        cancelReasons: zapierData.cancellation_reasons ? [zapierData.cancellation_reasons] : [],
+        otherReason: zapierData.other_reason || '',
+        marketingConsent: zapierData.subscription_preference || '',
+        englishImpact: '', // Not used in confirmation page
+        preferredStartTime: zapierData.preferred_start_time || '',
+        paymentReadiness: zapierData.payment_access || '',
+        pricingResponse: '', // Not used in confirmation page
+        name: zapierData.lead_name || '',
+        email: zapierData.lead_email || '',
+        campaignName: zapierData.campaign_name || '',
+        adsetName: zapierData.adset_name || '',
+        adName: zapierData.ad_name || '',
+        fbClickId: zapierData.fb_click_id || '',
+        sessionId: zapierData.session_id || '',
+        trigger: zapierData.trigger || '',
+        timestamp: zapierData.timestamp || new Date().toISOString(),
+        totalSessionTime: zapierData.total_session_time || 0,
+        events: zapierData.events || {},
+        userAgent: zapierData.user_agent || navigator.userAgent,
+        pageUrl: zapierData.page_url || window.location.href,
+        formStarted: zapierData.form_started || false,
+        formSubmitted: zapierData.form_submitted || false,
+        formInteractionTime: zapierData.form_interaction_time || 0
+      };
+
+      console.log('📤 Sending to ZapierService with formatted description:', formData);
+      
+      // Use ZapierService to send with proper description formatting
+      const response = await this.zapierService.sendToZapier(formData);
+      console.log('✅ Successfully sent to Zapier via ZapierService:', response);
+      
+    } catch (error) {
+      console.error('❌ Error sending to Zapier via ZapierService:', error);
+      // Fallback to old method if ZapierService fails
+      console.log('🔄 Falling back to old sendToZapier method...');
+      this.sendToZapier(zapierData);
+    }
   }
 
   private sendToHotjar(events: any) {
