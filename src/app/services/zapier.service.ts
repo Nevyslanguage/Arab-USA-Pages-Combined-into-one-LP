@@ -58,7 +58,20 @@ export class ZapierService {
       
       // Form responses
       params.set('response_type', formData.selectedResponse);
-      params.set('cancel_reasons', formData.cancelReasons.join(', '));
+      
+      // Debug cancel reasons
+      console.log('🔍 DEBUG - Cancel reasons in ZapierService:', formData.cancelReasons);
+      console.log('🔍 DEBUG - Cancel reasons type:', typeof formData.cancelReasons);
+      console.log('🔍 DEBUG - Cancel reasons length:', formData.cancelReasons?.length);
+      
+      if (formData.cancelReasons && formData.cancelReasons.length > 0) {
+        params.set('cancel_reasons', formData.cancelReasons.join(', '));
+        console.log('🔍 DEBUG - Setting cancel_reasons to:', formData.cancelReasons.join(', '));
+      } else {
+        params.set('cancel_reasons', '');
+        console.log('🔍 DEBUG - No cancel reasons found, setting to empty string');
+      }
+      
       if (formData.otherReason) {
         params.set('other_reason', formData.otherReason);
       }
@@ -108,6 +121,7 @@ export class ZapierService {
       console.log('Description being sent:', description);
       console.log('Description length:', description.length);
       console.log('Full URL being sent:', `${this.ZAPIER_WEBHOOK_URL}?${params.toString()}`);
+      console.log('🔍 DEBUG - All parameters being sent:', params.toString());
 
       // Send as GET request with query parameters
       const response = await this.http.get(`${this.ZAPIER_WEBHOOK_URL}?${params.toString()}`).toPromise();
@@ -277,9 +291,9 @@ export class ZapierService {
     if (formSubmitted === true) {
       switch (selectedResponse) {
         case 'Confirm Interest':
-          return 'confirmed';
+          return 'Confirmed';
         case 'Cancel':
-          return 'cancelled';
+          return 'Cancelled';
         default:
           return '';
       }

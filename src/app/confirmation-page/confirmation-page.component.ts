@@ -552,12 +552,13 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       ad_name: this.urlParams.adName,
       fb_click_id: this.urlParams.fbClickId,
       
-      // Confirmation page data
-      confirmation_choice: this.getChoiceEnglish(this.userSelections.choice || this.selectedChoice),
-      cancellation_reasons: this.getCancellationReasonsEnglish(this.userSelections.cancellationReasons || this.selectedCancellationReasons),
-      subscription_preference: this.userSelections.subscription || this.selectedSubscription,
-      preferred_start_time: this.getStartTimeEnglish(this.userSelections.startTime || this.selectedStartTime),
-      payment_access: this.getPaymentEnglish(this.userSelections.payment || this.selectedPayment),
+      // Confirmation page data - use current form state, not userSelections
+      confirmation_choice: this.getChoiceEnglish(this.selectedChoice),
+      cancellation_reasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+      other_reason: this.otherCancellationReason || '',
+      subscription_preference: this.selectedSubscription,
+      preferred_start_time: this.getStartTimeEnglish(this.selectedStartTime),
+      payment_access: this.getPaymentEnglish(this.selectedPayment),
       
       // Appointment status - NEW!
       appointment_status: appointmentStatus,
