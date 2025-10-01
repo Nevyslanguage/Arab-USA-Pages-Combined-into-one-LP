@@ -456,6 +456,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   private setupPageUnloadTracking() {
     window.addEventListener('beforeunload', () => {
+      console.log('🚪 Page unloading - sending tracking data');
       this.sendTrackingData('page_unload');
     });
   }
@@ -928,6 +929,13 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.log('📤 Sending to ZapierService with formatted description:', formData);
       console.log('🔍 Cancel reasons being sent:', formData.cancelReasons);
       
+      // Check if this is a page unload scenario and use sendBeacon for reliability
+      if (zapierData.trigger === 'page_unload' || zapierData.trigger === 'page_hidden') {
+        console.log('🚪 Page unloading - using sendBeacon for reliable data transmission');
+        this.sendToZapierWithBeacon(formData);
+        return;
+      }
+      
       // Use ZapierService to send with proper description formatting
       const response = await this.zapierService.sendToZapier(formData);
       console.log('✅ Successfully sent to Zapier via ZapierService:', response);
@@ -938,6 +946,209 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.log('🔄 Falling back to old sendToZapier method...');
       this.sendToZapier(zapierData);
     }
+  }
+
+  private sendToZapierWithBeacon(formData: any) {
+    try {
+      // Create URL parameters for the webhook
+      const params = new URLSearchParams();
+      
+      // Basic lead information
+      params.set('first_name', formData.name || 'Prospect');
+      params.set('last_name', 'Nevys');
+      params.set('company', 'Nevy\'s Language Prospect');
+      params.set('lead_source', 'Website Confirmation Page');
+      params.set('status', 'New');
+      
+      // Appointment status based on user response
+      const appointmentStatus = this.getAppointmentStatus(formData.selectedResponse, formData.formSubmitted, formData.formStarted);
+      params.set('appointment_status', appointmentStatus);
+      
+      // Form responses
+      params.set('response_type', formData.selectedResponse);
+      
+      if (formData.cancelReasons && formData.cancelReasons.length > 0) {
+        params.set('cancel_reasons', formData.cancelReasons.join(', '));
+      } else {
+        params.set('cancel_reasons', '');
+      }
+      
+      if (formData.otherReason) {
+        params.set('other_reason', formData.otherReason);
+      }
+      params.set('marketing_consent', formData.marketingConsent);
+      params.set('english_impact', formData.englishImpact);
+      params.set('preferred_start_time', formData.preferredStartTime);
+      params.set('payment_readiness', formData.paymentReadiness);
+      
+      // Campaign tracking data
+      if (formData.email) params.set('email', formData.email);
+      if (formData.campaignName) params.set('campaign_name', formData.campaignName);
+      if (formData.adsetName) params.set('adset_name', formData.adsetName);
+      if (formData.adName) params.set('ad_name', formData.adName);
+      if (formData.fbClickId) params.set('fb_click_id', formData.fbClickId);
+      
+      // Analytics data
+      if (formData.sessionId) params.set('session_id', formData.sessionId);
+      if (formData.trigger) params.set('trigger', formData.trigger);
+      if (formData.totalSessionTime) params.set('total_session_time', formData.totalSessionTime.toString());
+      if (formData.formStarted !== undefined) params.set('form_started', formData.formStarted.toString());
+      if (formData.formSubmitted !== undefined) params.set('form_submitted', formData.formSubmitted.toString());
+      if (formData.formInteractionTime) params.set('form_interaction_time', formData.formInteractionTime.toString());
+      
+      // Events data (convert to JSON string for URL parameter)
+      if (formData.events) {
+        params.set('events', JSON.stringify(formData.events));
+      }
+      
+      // Additional metadata
+      params.set('submission_date', new Date().toISOString());
+      params.set('source_url', window.location.href);
+      if (formData.userAgent) params.set('user_agent', formData.userAgent);
+      if (formData.pageUrl) params.set('page_url', formData.pageUrl);
+      
+      // Formatted description for Salesforce
+      const description = this.formatFormDataForDescription(formData);
+      params.set('description', description);
+      params.set('notes', description);
+      params.set('comments', description);
+      
+      const webhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1m4k02/';
+      const fullUrl = `${webhookUrl}?${params.toString()}`;
+      
+      console.log('📡 Using sendBeacon for reliable data transmission:', fullUrl);
+      
+      // Use sendBeacon for reliable transmission during page unload
+      const success = navigator.sendBeacon(fullUrl);
+      
+      if (success) {
+        console.log('✅ Data sent successfully via sendBeacon');
+      } else {
+        console.warn('⚠️ sendBeacon failed, trying fallback method');
+        // Fallback to regular fetch
+        fetch(fullUrl, { method: 'GET', keepalive: true })
+          .then(response => {
+            if (response.ok) {
+              console.log('✅ Fallback method succeeded');
+            } else {
+              console.error('❌ Fallback method failed:', response.status);
+            }
+          })
+          .catch(error => {
+            console.error('❌ Fallback method error:', error);
+          });
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in sendToZapierWithBeacon:', error);
+    }
+  }
+
+  private getAppointmentStatus(selectedResponse: string, formSubmitted?: boolean, formStarted?: boolean): string {
+    // If form was not started at all, return empty
+    if (formStarted === false) {
+      return '';
+    }
+    
+    // If form was started but not submitted, return specific status
+    if (formStarted === true && formSubmitted === false) {
+      switch (selectedResponse) {
+        case 'Confirm Interest':
+          return 'Started Confirming but dropped out';
+        case 'Cancel':
+          return 'Started Cancelling but dropped out';
+        default:
+          return 'Started form but dropped out';
+      }
+    }
+    
+    // If form was submitted, return final status
+    if (formSubmitted === true) {
+      switch (selectedResponse) {
+        case 'Confirm Interest':
+          return 'Confirmed';
+        case 'Cancel':
+          return 'Cancelled';
+        default:
+          return '';
+      }
+    }
+    
+    return '';
+  }
+
+  private formatFormDataForDescription(formData: any): string {
+    let description = `Confirmation Page Analytics - User Left Page\n\n`;
+    
+    // User response section
+    description += `User Response: ${formData.selectedResponse || 'No response'}\n`;
+    description += `Appointment Status: ${this.getAppointmentStatus(formData.selectedResponse, formData.formSubmitted, formData.formStarted) || 'Not set (user didn\'t complete form)'}\n\n`;
+    
+    // Show partial form data if they started but didn't complete
+    if (formData.formStarted && !formData.formSubmitted) {
+      description += `📝 PARTIAL FORM DATA (User started but didn't complete):\n`;
+      
+      if (formData.cancelReasons && formData.cancelReasons.length > 0) {
+        description += `• Cancellation Reasons Selected: ${formData.cancelReasons.join(', ')}\n`;
+      }
+      
+      if (formData.marketingConsent) {
+        description += `• Marketing Consent: ${formData.marketingConsent}\n`;
+      }
+      
+      if (formData.preferredStartTime) {
+        description += `• Preferred Start Time: ${formData.preferredStartTime}\n`;
+      }
+      
+      if (formData.paymentReadiness) {
+        description += `• Payment Readiness: ${formData.paymentReadiness}\n`;
+      }
+      
+      if (formData.otherReason) {
+        description += `• Other Reason Details: ${formData.otherReason}\n`;
+      }
+      
+      description += `\n⚠️ This user showed interest by starting the form but didn't complete it\n\n`;
+    }
+    
+    // Session analytics
+    description += `\nSession Analytics:\n`;
+    description += `Session ID: ${formData.sessionId}\n`;
+    description += `Total Session Time: ${this.formatTime(formData.totalSessionTime)}\n`;
+    description += `Form Started: ${formData.formStarted ? 'Yes' : 'No'}\n`;
+    description += `Form Submitted: ${formData.formSubmitted ? 'Yes' : 'No'}\n`;
+    
+    if (formData.formInteractionTime > 0) {
+      description += `Form Interaction Time: ${this.formatTime(formData.formInteractionTime)}\n`;
+    }
+    
+    // Section time analytics
+    if (formData.events) {
+      description += `\nTime Spent on Sections:\n`;
+      Object.keys(formData.events).forEach(key => {
+        if (key.includes('session_duration_on_') && formData.events[key] > 0) {
+          const sectionName = key.replace('session_duration_on_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+          description += `• ${sectionName}: ${this.formatTime(formData.events[key])}\n`;
+        }
+      });
+      
+      if (formData.events.session_idle_time_duration > 0) {
+        description += `• Idle Time: ${this.formatTime(formData.events.session_idle_time_duration)}\n`;
+      }
+    }
+    
+    // Campaign data
+    if (formData.campaignName || formData.adsetName || formData.adName) {
+      description += `\nCampaign Tracking:\n`;
+      if (formData.campaignName) description += `Campaign: ${formData.campaignName}\n`;
+      if (formData.adsetName) description += `Adset: ${formData.adsetName}\n`;
+      if (formData.adName) description += `Ad: ${formData.adName}\n`;
+    }
+    
+    description += `\nTrigger: ${formData.trigger}\n`;
+    description += `Submitted on: ${new Date().toLocaleString()}`;
+    
+    return description;
   }
 
   private sendToHotjar(events: any) {
