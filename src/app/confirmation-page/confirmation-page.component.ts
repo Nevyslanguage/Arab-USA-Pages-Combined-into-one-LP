@@ -533,9 +533,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Only set appointment status if they actually completed the form
     if (this.formSubmitted) {
       if (userChoice === 'confirm') {
-        appointmentStatus = 'confirmed';
+        appointmentStatus = 'Confirmed';
       } else if (userChoice === 'cancel') {
-        appointmentStatus = 'cancelled';
+        appointmentStatus = 'Cancelled';
       }
     }
     // If they started but didn't submit, appointment status remains empty
