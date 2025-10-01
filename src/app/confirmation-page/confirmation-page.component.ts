@@ -899,7 +899,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       // Convert the zapierData to the format expected by ZapierService
       const formData = {
         selectedResponse: zapierData.confirmation_choice || 'No response',
-        cancelReasons: zapierData.cancellation_reasons ? [zapierData.cancellation_reasons] : [],
+        cancelReasons: zapierData.cancellation_reasons || [],
         otherReason: zapierData.other_reason || '',
         marketingConsent: zapierData.subscription_preference || '',
         englishImpact: '', // Not used in confirmation page
@@ -925,6 +925,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       };
 
       console.log('📤 Sending to ZapierService with formatted description:', formData);
+      console.log('🔍 Cancel reasons being sent:', formData.cancelReasons);
       
       // Use ZapierService to send with proper description formatting
       const response = await this.zapierService.sendToZapier(formData);
