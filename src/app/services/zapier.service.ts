@@ -53,7 +53,7 @@ export class ZapierService {
       params.set('status', 'New');
       
       // Appointment status based on user response
-      const appointmentStatus = this.getAppointmentStatus(formData.selectedResponse);
+      const appointmentStatus = this.getAppointmentStatus(formData.selectedResponse, formData.formSubmitted);
       params.set('appointment_status', appointmentStatus);
       
       // Form responses
@@ -124,7 +124,7 @@ export class ZapierService {
     
     // Form responses section
     description += `Response: ${formData.selectedResponse}\n`;
-    description += `Appointment Status: ${this.getAppointmentStatus(formData.selectedResponse)}\n\n`;
+    description += `Appointment Status: ${this.getAppointmentStatus(formData.selectedResponse, formData.formSubmitted)}\n\n`;
     
     if (formData.cancelReasons && formData.cancelReasons.length > 0) {
       description += `Cancel Reasons: ${formData.cancelReasons.join(', ')}\n\n`;
@@ -255,7 +255,12 @@ export class ZapierService {
   }
 
   // Get appointment status based on user response
-  private getAppointmentStatus(selectedResponse: string): string {
+  private getAppointmentStatus(selectedResponse: string, formSubmitted?: boolean): string {
+    // Only set appointment status if the form was actually submitted
+    if (formSubmitted === false) {
+      return ''; // User started but didn't submit - appointment status should be empty
+    }
+    
     switch (selectedResponse) {
       case 'Confirm Interest':
         return 'confirmed';
