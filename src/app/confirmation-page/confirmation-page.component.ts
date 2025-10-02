@@ -423,6 +423,11 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private resetIdleTimer() {
+    // Don't reset timer if idle popup is already showing or thank you screen is showing
+    if (this.showIdlePopup || this.showThankYouScreen) {
+      return;
+    }
+    
     // Update last activity time
     this.idleTime.lastActivity = Date.now();
     
@@ -430,14 +435,24 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
     }
+    if (this.idlePopupTimer) {
+      clearTimeout(this.idlePopupTimer);
+    }
     
-    // Set new 180-second timer
+    // Set new 90-second timer to show popup
     if (!this.showThankYouScreen) {
-      console.log('🔄 Starting 180-second timer');
+      console.log('🔄 Starting 90-second timer for popup');
       this.idleTimer = setTimeout(() => {
-        console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-        this.sendTrackingData('idle_timeout_180_seconds');
-      }, 180000); // 180 seconds = 3 minutes
+        this.showIdlePopup = true;
+        document.body.style.overflow = 'hidden';
+        console.log('💬 Showing idle popup - asking if user is still there');
+        
+        // Start another 90-second timer for popup interaction
+        this.idlePopupTimer = setTimeout(() => {
+          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+          this.sendTrackingData('idle_timeout_180_seconds');
+        }, 90000); // Another 90 seconds
+      }, 90000); // 90 seconds to show popup
     }
   }
 
@@ -613,13 +628,26 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     console.log('🔍 Checking if 180 seconds passed:', {
       timeSinceLastActivity: timeSinceLastActivity,
-      threshold: this.idleTime.idleThreshold,
-      shouldSend: timeSinceLastActivity >= this.idleTime.idleThreshold
+      threshold: 180000,
+      shouldSend: timeSinceLastActivity >= 180000
     });
     
-    if (timeSinceLastActivity >= this.idleTime.idleThreshold) {
+    if (timeSinceLastActivity >= 180000) {
       console.log('⏰ 180 seconds total inactivity detected - sending analytics');
       this.sendTrackingData('idle_timeout_180_seconds');
+    } else if (timeSinceLastActivity >= 90000) {
+      // Show popup if 90 seconds have passed
+      if (!this.showIdlePopup) {
+        this.showIdlePopup = true;
+        document.body.style.overflow = 'hidden';
+        console.log('💬 Showing idle popup - asking if user is still there');
+        
+        // Start timer for popup interaction
+        this.idlePopupTimer = setTimeout(() => {
+          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+          this.sendTrackingData('idle_timeout_180_seconds');
+        }, 90000); // Another 90 seconds
+      }
     }
   }
 
