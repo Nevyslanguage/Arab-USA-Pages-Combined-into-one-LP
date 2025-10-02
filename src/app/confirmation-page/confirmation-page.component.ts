@@ -245,6 +245,15 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.setupPageUnloadTracking();
     this.checkStoredIdleTimeout();
     this.setupScrollDetection();
+    
+    // Test Zapier connection on page load
+    this.testZapierConnection();
+    
+    // Check for stored idle timeout data
+    this.checkStoredIdleTimeoutData();
+    
+    // Check for popup shown while away
+    this.checkPopupWhileAway();
   }
 
   ngOnDestroy() {
@@ -482,10 +491,18 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         // User left the tab/app - store current idle state
         this.storeIdleState();
         console.log('👋 User left tab - storing idle state');
+        
+        // If popup is showing, store it as "popup shown while away"
+        if (this.showIdlePopup) {
+          this.storePopupWhileAway();
+        }
       } else {
         // User returned to tab - check if we should continue idle tracking
         this.restoreIdleState();
         console.log('👋 User returned to tab - checking idle state');
+        
+        // Check if popup was shown while user was away
+        this.checkPopupWhileAway();
       }
     });
   }
@@ -623,21 +640,21 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private setupMobileSafariBackup() {
-    // Set up a backup mechanism for mobile Safari
-    // This runs when the tab becomes visible again
+    // Set up a backup mechanism that works even when tab is inactive
+    // This uses timestamp-based tracking instead of setTimeout
     const checkIdleTimeout = () => {
       if (this.idleTime.popupShownAt && this.showIdlePopup) {
         const now = Date.now();
         const timeSincePopup = now - this.idleTime.popupShownAt;
         
-        console.log('🔍 Mobile Safari backup check:', {
+        console.log('🔍 Background idle check:', {
           timeSincePopup: timeSincePopup,
           threshold: this.idleTime.idleThreshold,
           shouldSend: timeSincePopup >= this.idleTime.idleThreshold
         });
         
         if (timeSincePopup >= this.idleTime.idleThreshold) {
-          console.log('⏰ Mobile Safari: 180 seconds total inactivity - sending analytics via backup');
+          console.log('⏰ Background: 180 seconds total inactivity - sending analytics');
           this.sendTrackingData('idle_timeout_180_seconds');
           this.showIdlePopup = false;
           document.body.style.overflow = 'auto';
@@ -665,11 +682,39 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       setTimeout(checkIdleTimeout, 100);
     });
     
-    // Periodic check every 10 seconds as additional backup
+    // Aggressive background tracking - works even when tab is inactive
+    // Store the timeout check in localStorage so it persists across tab switches
+    const storeTimeoutCheck = () => {
+      if (this.idleTime.popupShownAt && this.showIdlePopup) {
+        const timeoutData = {
+          popupShownAt: this.idleTime.popupShownAt,
+          sessionId: this.sessionId,
+          timestamp: Date.now()
+        };
+        
+        try {
+          localStorage.setItem('nevys_idle_timeout', JSON.stringify(timeoutData));
+          console.log('💾 Stored idle timeout check:', timeoutData);
+        } catch (e) {
+          console.warn('⚠️ Could not store timeout check:', e);
+        }
+      }
+    };
+    
+    // Store timeout check immediately when popup is shown
+    storeTimeoutCheck();
+    
+    // Periodic check every 5 seconds (more frequent for better reliability)
     const periodicCheck = setInterval(() => {
       if (this.idleTime.popupShownAt && this.showIdlePopup) {
         const now = Date.now();
         const timeSincePopup = now - this.idleTime.popupShownAt;
+        
+        console.log('🔄 Periodic background check:', {
+          timeSincePopup: timeSincePopup,
+          threshold: this.idleTime.idleThreshold,
+          shouldSend: timeSincePopup >= this.idleTime.idleThreshold
+        });
         
         if (timeSincePopup >= this.idleTime.idleThreshold) {
           console.log('⏰ Periodic check: 180 seconds total inactivity - sending analytics');
@@ -678,17 +723,24 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           document.body.style.overflow = 'auto';
           clearInterval(periodicCheck);
           
+          // Clear stored timeout check
+          localStorage.removeItem('nevys_idle_timeout');
+          
           // Clear the popup timer
           if (this.idlePopupTimer) {
             clearTimeout(this.idlePopupTimer);
             this.idlePopupTimer = null;
           }
+        } else {
+          // Update stored timeout check
+          storeTimeoutCheck();
         }
       } else {
         // Clear interval if popup is no longer showing
         clearInterval(periodicCheck);
+        localStorage.removeItem('nevys_idle_timeout');
       }
-    }, 10000); // Check every 10 seconds
+    }, 5000); // Check every 5 seconds
     
     // Universal backup: Check on any user interaction (works on all browsers)
     const universalBackupEvents = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart', 'click', 'keydown'];
@@ -881,67 +933,78 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       return;
     }
     
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds)
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime
+    };
+
+    // Prepare form data in the successful format with analytics
+    const formData: FormData = {
+      selectedResponse: this.getChoiceEnglish(this.selectedChoice),
+      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+      otherReason: this.otherCancellationReason || undefined, // Include custom reason text
+      marketingConsent: this.selectedSubscription,
+      englishImpact: 'Not Applicable', // This form doesn't have English impact question
+      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
+      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
+      pricingResponse: this.selectedPlan || 'Not Selected',
+      name: this.urlParams.name,
+      email: this.urlParams.email,
+      campaignName: this.urlParams.campaignName,
+      adsetName: this.urlParams.adsetName,
+      adName: this.urlParams.adName,
+      fbClickId: this.urlParams.fbClickId,
+      // Analytics data
+      sessionId: this.sessionId,
+      trigger: 'form_submission',
+      timestamp: new Date().toISOString(),
+      totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      formInteractionTime: formInteractionTime
+    };
+
     try {
-      // Calculate form interaction time
-      let formInteractionTime = 0;
-      if (this.formStarted && this.formStartTime > 0) {
-        formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
-      }
-
-      // Prepare events data (convert to seconds)
-      const events = {
-        session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
-        session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
-        session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
-        session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
-        session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
-        session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
-        session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
-        session_idle_time_duration: Math.round(this.idleTime.total / 1000),
-        form_started: this.formStarted,
-        form_submitted: this.formSubmitted,
-        form_interaction_time: formInteractionTime
-      };
-
-      // Prepare form data in the successful format with analytics
-      const formData: FormData = {
-        selectedResponse: this.getChoiceEnglish(this.selectedChoice),
-        cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
-        otherReason: this.otherCancellationReason || undefined, // Include custom reason text
-        marketingConsent: this.selectedSubscription,
-        englishImpact: 'Not Applicable', // This form doesn't have English impact question
-        preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
-        paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
-        pricingResponse: this.selectedPlan || 'Not Selected',
-        name: this.urlParams.name,
-        email: this.urlParams.email,
-        campaignName: this.urlParams.campaignName,
-        adsetName: this.urlParams.adsetName,
-        adName: this.urlParams.adName,
-        fbClickId: this.urlParams.fbClickId,
-        // Analytics data
-        sessionId: this.sessionId,
-        trigger: 'form_submission',
-        timestamp: new Date().toISOString(),
-        totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
-        events: events,
-        userAgent: navigator.userAgent,
-        pageUrl: window.location.href,
-        formStarted: this.formStarted,
-        formSubmitted: this.formSubmitted,
-        formInteractionTime: formInteractionTime
-      };
-
       console.log('📤 Sending form data with analytics to Zapier:', formData);
       
       // Send using the new service
+      console.log('🚀 Attempting to send form data to Zapier...');
       const response = await this.zapierService.sendToZapier(formData);
       console.log('✅ Successfully sent to Zapier:', response);
       
-    } catch (error) {
-      console.error('❌ Error sending to Zapier:', error);
-      console.log('⚠️ Continuing without Zapier integration...');
-      // Don't throw error, just log it so the app continues to work
+    } catch (error: any) {
+      console.error('❌ Zapier Service Error:', {
+        error: error,
+        message: error?.message || 'Unknown error',
+        status: error?.status || 'Unknown status'
+      });
+      
+      // Try fallback method
+      console.log('🔄 Trying fallback method...');
+      try {
+        this.sendToZapier(formData);
+      } catch (fallbackError: any) {
+        console.error('❌ Fallback method also failed:', fallbackError);
+      }
     }
   }
 
@@ -2072,6 +2135,154 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     console.log('💬 User chose to leave page - showing thank you screen');
     console.log('🔍 showThankYouScreen value:', this.showThankYouScreen);
+  }
+
+  private storePopupWhileAway() {
+    try {
+      const popupWhileAwayData = {
+        popupShownAt: this.idleTime.popupShownAt,
+        sessionId: this.sessionId,
+        timestamp: Date.now(),
+        userLeftWhilePopupShowing: true
+      };
+      
+      localStorage.setItem('nevys_popup_while_away', JSON.stringify(popupWhileAwayData));
+      console.log('💾 Stored popup while away data:', popupWhileAwayData);
+    } catch (e) {
+      console.warn('⚠️ Could not store popup while away data:', e);
+    }
+  }
+
+  private checkPopupWhileAway() {
+    try {
+      const stored = localStorage.getItem('nevys_popup_while_away');
+      if (!stored) return;
+      
+      const popupData = JSON.parse(stored);
+      
+      // Only check if it's the same session
+      if (popupData.sessionId !== this.sessionId) {
+        localStorage.removeItem('nevys_popup_while_away');
+        return;
+      }
+      
+      const now = Date.now();
+      const timeSincePopup = now - popupData.popupShownAt;
+      
+      console.log('🔍 Checking popup shown while away:', {
+        timeSincePopup: timeSincePopup,
+        threshold: this.idleTime.idleThreshold,
+        shouldSend: timeSincePopup >= this.idleTime.idleThreshold
+      });
+      
+      if (timeSincePopup >= this.idleTime.idleThreshold) {
+        // 180 seconds total inactivity - send analytics immediately
+        console.log('⏰ Popup while away: 180 seconds total inactivity - sending analytics immediately');
+        this.sendTrackingData('idle_timeout_180_seconds');
+        this.showIdlePopup = false;
+        document.body.style.overflow = 'auto';
+        localStorage.removeItem('nevys_popup_while_away');
+      } else {
+        // Show popup and continue timer
+        this.idleTime.popupShownAt = popupData.popupShownAt;
+        this.showIdlePopup = true;
+        document.body.style.overflow = 'hidden';
+        
+        const remainingTime = this.idleTime.idleThreshold - timeSincePopup;
+        this.idlePopupTimer = setTimeout(() => {
+          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+          this.sendTrackingData('idle_timeout_180_seconds');
+        }, remainingTime);
+        
+        console.log('💬 Restored popup that was shown while away, remaining time:', remainingTime);
+        localStorage.removeItem('nevys_popup_while_away');
+      }
+      
+    } catch (e) {
+      console.warn('⚠️ Could not check popup while away data:', e);
+      localStorage.removeItem('nevys_popup_while_away');
+    }
+  }
+
+  private checkStoredIdleTimeoutData() {
+    try {
+      const stored = localStorage.getItem('nevys_idle_timeout');
+      if (!stored) return;
+      
+      const timeoutData = JSON.parse(stored);
+      
+      // Only check if it's the same session
+      if (timeoutData.sessionId !== this.sessionId) {
+        localStorage.removeItem('nevys_idle_timeout');
+        return;
+      }
+      
+      const now = Date.now();
+      const timeSincePopup = now - timeoutData.popupShownAt;
+      
+      console.log('🔍 Checking stored idle timeout data:', {
+        timeSincePopup: timeSincePopup,
+        threshold: this.idleTime.idleThreshold,
+        shouldSend: timeSincePopup >= this.idleTime.idleThreshold
+      });
+      
+      if (timeSincePopup >= this.idleTime.idleThreshold) {
+        // 180 seconds total inactivity - send analytics immediately
+        console.log('⏰ Stored timeout: 180 seconds total inactivity - sending analytics immediately');
+        this.sendTrackingData('idle_timeout_180_seconds');
+        localStorage.removeItem('nevys_idle_timeout');
+      } else {
+        // Restore the popup and continue tracking
+        this.idleTime.popupShownAt = timeoutData.popupShownAt;
+        this.showIdlePopup = true;
+        document.body.style.overflow = 'hidden';
+        
+        const remainingTime = this.idleTime.idleThreshold - timeSincePopup;
+        this.idlePopupTimer = setTimeout(() => {
+          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+          this.sendTrackingData('idle_timeout_180_seconds');
+        }, remainingTime);
+        
+        console.log('💬 Restored idle popup with remaining time:', remainingTime);
+      }
+      
+    } catch (e) {
+      console.warn('⚠️ Could not check stored idle timeout data:', e);
+      localStorage.removeItem('nevys_idle_timeout');
+    }
+  }
+
+  private async testZapierConnection() {
+    try {
+      console.log('🧪 Testing Zapier connection...');
+      
+      const testData = {
+        selectedResponse: 'Test Connection',
+        cancelReasons: ['Test'],
+        marketingConsent: 'Test',
+        englishImpact: 'Test',
+        preferredStartTime: 'Test',
+        paymentReadiness: 'Test',
+        pricingResponse: 'Test',
+        sessionId: 'test_' + Date.now(),
+        trigger: 'connection_test',
+        timestamp: new Date().toISOString(),
+        totalSessionTime: 0,
+        events: { test: true },
+        userAgent: navigator.userAgent,
+        pageUrl: window.location.href,
+        formStarted: false,
+        formSubmitted: false,
+        formInteractionTime: 0
+      };
+      
+      const response = await this.zapierService.sendToZapier(testData);
+      console.log('✅ Zapier connection test successful:', response);
+      
+    } catch (error) {
+      console.error('❌ Zapier connection test failed:', error);
+      console.log('🔧 Check your webhook URL and network connection');
+    }
   }
 
   private sendSessionDataToZapier() {
