@@ -652,20 +652,55 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private setupBackgroundTracking() {
-    // Simple approach: Check when user returns to tab
+    // Store last activity time in localStorage for persistence
+    const storeLastActivity = () => {
+      try {
+        const activityData = {
+          lastActivity: this.idleTime.lastActivity,
+          sessionId: this.sessionId,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('nevys_last_activity', JSON.stringify(activityData));
+        console.log('💾 Stored last activity:', activityData);
+      } catch (e) {
+        console.warn('⚠️ Could not store last activity:', e);
+      }
+    };
+
+    // Store activity when user leaves
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        // User returned to tab - check if 180 seconds have passed
+      if (document.hidden) {
+        storeLastActivity();
+        console.log('👋 User left tab - stored activity data');
+      } else {
+        // User returned - check if 180 seconds have passed
         console.log('👋 User returned to tab - checking if 180 seconds passed');
-        this.checkIf180SecondsPassed();
+        this.checkStoredActivityAndSendIfNeeded();
       }
     });
 
-    // Also check on page focus
-    window.addEventListener('focus', () => {
-      console.log('👋 Page focused - checking if 180 seconds passed');
-      this.checkIf180SecondsPassed();
+    // Also store on page unload
+    window.addEventListener('beforeunload', () => {
+      storeLastActivity();
     });
+
+    // AGGRESSIVE: Check every 5 seconds even when tab is inactive
+    setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastActivity = now - this.idleTime.lastActivity;
+      
+      console.log('🔄 AGGRESSIVE background check:', {
+        timeSinceLastActivity: timeSinceLastActivity,
+        threshold: 180000,
+        shouldSend: timeSinceLastActivity >= 180000,
+        userAway: document.hidden
+      });
+      
+      if (timeSinceLastActivity >= 180000) {
+        console.log('⏰ AGGRESSIVE: 180 seconds total inactivity - sending analytics NOW');
+        this.sendTrackingData('idle_timeout_180_seconds');
+      }
+    }, 5000); // Check every 5 seconds
   }
 
   private checkStoredActivityAndSendIfNeeded() {
@@ -686,14 +721,31 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       
       console.log('🔍 Checking stored activity data:', {
         timeSinceLastActivity: timeSinceLastActivity,
-        threshold: this.idleTime.idleThreshold,
-        shouldSend: timeSinceLastActivity >= this.idleTime.idleThreshold
+        threshold: 180000,
+        shouldSend: timeSinceLastActivity >= 180000
       });
       
-      if (timeSinceLastActivity >= this.idleTime.idleThreshold) {
+      if (timeSinceLastActivity >= 180000) {
         console.log('⏰ Stored activity: 180 seconds total inactivity - sending analytics');
         this.sendTrackingData('idle_timeout_180_seconds');
         localStorage.removeItem('nevys_last_activity');
+      } else if (timeSinceLastActivity >= 90000) {
+        // Show popup if 90 seconds have passed
+        if (!this.showIdlePopup) {
+          this.showIdlePopup = true;
+          document.body.style.overflow = 'hidden';
+          console.log('💬 Showing idle popup - asking if user is still there');
+          
+          // Start timer for popup interaction
+          this.idlePopupTimer = setTimeout(() => {
+            console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+            this.sendTrackingData('idle_timeout_180_seconds');
+          }, 90000); // Another 90 seconds
+        }
+        
+        // Update the stored activity with current time
+        this.idleTime.lastActivity = activityData.lastActivity;
+        console.log('🔄 Updated last activity from stored data');
       } else {
         // Update the stored activity with current time
         this.idleTime.lastActivity = activityData.lastActivity;
@@ -739,7 +791,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   private sendTrackingData(trigger: string) {
     // Use sendBeacon for reliable transmission when user is away
-    if (document.hidden && (trigger === 'idle_timeout_180_seconds' || trigger === 'page_unload')) {
+    if (document.hidden && trigger === 'idle_timeout_180_seconds') {
       console.log('📡 User is away - using sendBeacon for reliable data transmission');
       this.sendTrackingDataWithBeacon(trigger);
       return;
