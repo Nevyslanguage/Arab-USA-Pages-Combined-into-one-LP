@@ -243,6 +243,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.setupIntersectionObservers();
     this.setupIdleTracking();
     this.setupPageUnloadTracking();
+    this.setupBackgroundTracking();
     this.checkStoredIdleTimeout();
     this.setupScrollDetection();
     
@@ -640,6 +641,96 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     if (timeSinceLastActivity >= this.idleTime.idleThreshold) {
       console.log('⏰ 180 seconds total inactivity detected - sending analytics');
       this.sendTrackingData('idle_timeout_180_seconds');
+    }
+  }
+
+  private setupBackgroundTracking() {
+    // Store the last activity time in localStorage so it persists across tab switches
+    const storeLastActivity = () => {
+      try {
+        const activityData = {
+          lastActivity: this.idleTime.lastActivity,
+          sessionId: this.sessionId,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('nevys_last_activity', JSON.stringify(activityData));
+        console.log('💾 Stored last activity:', activityData);
+      } catch (e) {
+        console.warn('⚠️ Could not store last activity:', e);
+      }
+    };
+
+    // Store activity data when user leaves
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        storeLastActivity();
+        console.log('👋 User left tab - stored activity data');
+      } else {
+        // User returned - check if 180 seconds have passed
+        this.checkStoredActivityAndSendIfNeeded();
+      }
+    });
+
+    // Also store on page unload
+    window.addEventListener('beforeunload', () => {
+      storeLastActivity();
+    });
+
+    // AGGRESSIVE: Periodic check every 10 seconds that works even when tab is inactive
+    // This ensures we catch the 180-second timeout even if the user never returns
+    setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastActivity = now - this.idleTime.lastActivity;
+      
+      console.log('🔄 Periodic background check:', {
+        timeSinceLastActivity: timeSinceLastActivity,
+        threshold: this.idleTime.idleThreshold,
+        shouldSend: timeSinceLastActivity >= this.idleTime.idleThreshold,
+        userAway: document.hidden
+      });
+      
+      if (timeSinceLastActivity >= this.idleTime.idleThreshold) {
+        console.log('⏰ Periodic check: 180 seconds total inactivity - sending analytics');
+        this.sendTrackingData('idle_timeout_180_seconds');
+      }
+    }, 10000); // Check every 10 seconds
+  }
+
+  private checkStoredActivityAndSendIfNeeded() {
+    try {
+      const stored = localStorage.getItem('nevys_last_activity');
+      if (!stored) return;
+      
+      const activityData = JSON.parse(stored);
+      
+      // Only check if it's the same session
+      if (activityData.sessionId !== this.sessionId) {
+        localStorage.removeItem('nevys_last_activity');
+        return;
+      }
+      
+      const now = Date.now();
+      const timeSinceLastActivity = now - activityData.lastActivity;
+      
+      console.log('🔍 Checking stored activity data:', {
+        timeSinceLastActivity: timeSinceLastActivity,
+        threshold: this.idleTime.idleThreshold,
+        shouldSend: timeSinceLastActivity >= this.idleTime.idleThreshold
+      });
+      
+      if (timeSinceLastActivity >= this.idleTime.idleThreshold) {
+        console.log('⏰ Stored activity: 180 seconds total inactivity - sending analytics');
+        this.sendTrackingData('idle_timeout_180_seconds');
+        localStorage.removeItem('nevys_last_activity');
+      } else {
+        // Update the stored activity with current time
+        this.idleTime.lastActivity = activityData.lastActivity;
+        console.log('🔄 Updated last activity from stored data');
+      }
+      
+    } catch (e) {
+      console.warn('⚠️ Could not check stored activity data:', e);
+      localStorage.removeItem('nevys_last_activity');
     }
   }
 
