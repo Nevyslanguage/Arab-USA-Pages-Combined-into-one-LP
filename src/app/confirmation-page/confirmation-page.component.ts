@@ -244,14 +244,13 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.setupIdleTracking();
     this.setupPageUnloadTracking();
     this.setupBackgroundTracking();
-    this.checkStoredIdleTimeout();
     this.setupScrollDetection();
     
     // Test Zapier connection on page load
     this.testZapierConnection();
     
-    // Check if 180 seconds have passed since last activity
-    this.checkIf180SecondsPassed();
+    // Start the 180-second timer
+    this.resetIdleTimer();
   }
 
   ngOnDestroy() {
@@ -424,39 +423,21 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private resetIdleTimer() {
-    // Don't reset timer if idle popup is already showing or thank you screen is showing
-    if (this.showIdlePopup || this.showThankYouScreen) {
-      return;
-    }
+    // Update last activity time
+    this.idleTime.lastActivity = Date.now();
     
-    const now = Date.now();
-    
-    // If user was idle, add the idle time to total
-    if (this.idleTime.isIdle) {
-      const idlePeriod = now - this.idleTime.lastActivity;
-      this.idleTime.total += idlePeriod;
-      console.log('🔄 User activity detected. Idle period:', idlePeriod, 'ms, Total idle:', this.idleTime.total, 'ms');
-    }
-    
-    // Reset idle state
-    this.idleTime.isIdle = false;
-    this.idleTime.lastActivity = now;
-    
-    // Clear existing timers
+    // Clear existing timer
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
     }
-    if (this.idlePopupTimer) {
-      clearTimeout(this.idlePopupTimer);
-    }
     
-    // Set new idle timer - track 180 seconds of total inactivity
-    // Only start timer if thank you screen is not showing
+    // Set new 180-second timer
     if (!this.showThankYouScreen) {
+      console.log('🔄 Starting 180-second timer');
       this.idleTimer = setTimeout(() => {
         console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
         this.sendTrackingData('idle_timeout_180_seconds');
-      }, this.idleTime.idleThreshold); // 180 seconds total
+      }, 180000); // 180 seconds = 3 minutes
     }
   }
 
@@ -470,10 +451,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Handle page visibility changes (tab switching, app switching)
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        // User left the tab/app
         console.log('👋 User left tab');
       } else {
-        // User returned to tab - check if 180 seconds have passed
         console.log('👋 User returned to tab - checking if 180 seconds passed');
         this.checkIf180SecondsPassed();
       }
@@ -645,55 +624,20 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private setupBackgroundTracking() {
-    // Store the last activity time in localStorage so it persists across tab switches
-    const storeLastActivity = () => {
-      try {
-        const activityData = {
-          lastActivity: this.idleTime.lastActivity,
-          sessionId: this.sessionId,
-          timestamp: Date.now()
-        };
-        localStorage.setItem('nevys_last_activity', JSON.stringify(activityData));
-        console.log('💾 Stored last activity:', activityData);
-      } catch (e) {
-        console.warn('⚠️ Could not store last activity:', e);
-      }
-    };
-
-    // Store activity data when user leaves
+    // Simple approach: Check when user returns to tab
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        storeLastActivity();
-        console.log('👋 User left tab - stored activity data');
-      } else {
-        // User returned - check if 180 seconds have passed
-        this.checkStoredActivityAndSendIfNeeded();
+      if (!document.hidden) {
+        // User returned to tab - check if 180 seconds have passed
+        console.log('👋 User returned to tab - checking if 180 seconds passed');
+        this.checkIf180SecondsPassed();
       }
     });
 
-    // Also store on page unload
-    window.addEventListener('beforeunload', () => {
-      storeLastActivity();
+    // Also check on page focus
+    window.addEventListener('focus', () => {
+      console.log('👋 Page focused - checking if 180 seconds passed');
+      this.checkIf180SecondsPassed();
     });
-
-    // AGGRESSIVE: Periodic check every 10 seconds that works even when tab is inactive
-    // This ensures we catch the 180-second timeout even if the user never returns
-    setInterval(() => {
-      const now = Date.now();
-      const timeSinceLastActivity = now - this.idleTime.lastActivity;
-      
-      console.log('🔄 Periodic background check:', {
-        timeSinceLastActivity: timeSinceLastActivity,
-        threshold: this.idleTime.idleThreshold,
-        shouldSend: timeSinceLastActivity >= this.idleTime.idleThreshold,
-        userAway: document.hidden
-      });
-      
-      if (timeSinceLastActivity >= this.idleTime.idleThreshold) {
-        console.log('⏰ Periodic check: 180 seconds total inactivity - sending analytics');
-        this.sendTrackingData('idle_timeout_180_seconds');
-      }
-    }, 10000); // Check every 10 seconds
   }
 
   private checkStoredActivityAndSendIfNeeded() {
