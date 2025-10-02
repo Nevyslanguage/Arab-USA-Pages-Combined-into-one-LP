@@ -63,7 +63,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     total: 0,
     lastActivity: 0,
     isIdle: false,
-    idleThreshold: 90000 // 90 seconds - very reasonable for reading content
+    idleThreshold: 180000 // 180 seconds total inactivity
   };
   private idleTimer: any = null;
   private idlePopupTimer: any = null;
@@ -249,11 +249,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Test Zapier connection on page load
     this.testZapierConnection();
     
-    // Check for stored idle timeout data
-    this.checkStoredIdleTimeoutData();
-    
-    // Check for popup shown while away
-    this.checkPopupWhileAway();
+    // Check if 180 seconds have passed since last activity
+    this.checkIf180SecondsPassed();
   }
 
   ngOnDestroy() {
@@ -452,29 +449,13 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       clearTimeout(this.idlePopupTimer);
     }
     
-    // Set new idle timer - show popup after 90 seconds of inactivity
+    // Set new idle timer - track 180 seconds of total inactivity
     // Only start timer if thank you screen is not showing
     if (!this.showThankYouScreen) {
       this.idleTimer = setTimeout(() => {
-        this.idleTime.isIdle = true;
-        this.showIdlePopup = true;
-        document.body.style.overflow = 'hidden';
-        console.log('💬 Showing idle popup - asking if user is still there');
-        
-        // Store when popup was shown for timestamp-based tracking
-        this.idleTime.popupShownAt = Date.now();
-        
-        // Start 90-second timer for popup interaction
-        // If user doesn't interact with popup within 90 seconds, send analytics
-        this.idlePopupTimer = setTimeout(() => {
-          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-          this.sendTrackingData('idle_timeout_180_seconds');
-        }, this.idleTime.idleThreshold); // Another 90 seconds
-        
-        // Also set up a backup check that runs when tab becomes visible
-        // This handles mobile Safari where setTimeout might not fire
-        this.setupMobileSafariBackup();
-      }, this.idleTime.idleThreshold);
+        console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+        this.sendTrackingData('idle_timeout_180_seconds');
+      }, this.idleTime.idleThreshold); // 180 seconds total
     }
   }
 
@@ -488,21 +469,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Handle page visibility changes (tab switching, app switching)
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        // User left the tab/app - store current idle state
-        this.storeIdleState();
-        console.log('👋 User left tab - storing idle state');
-        
-        // If popup is showing, store it as "popup shown while away"
-        if (this.showIdlePopup) {
-          this.storePopupWhileAway();
-        }
+        // User left the tab/app
+        console.log('👋 User left tab');
       } else {
-        // User returned to tab - check if we should continue idle tracking
-        this.restoreIdleState();
-        console.log('👋 User returned to tab - checking idle state');
-        
-        // Check if popup was shown while user was away
-        this.checkPopupWhileAway();
+        // User returned to tab - check if 180 seconds have passed
+        console.log('👋 User returned to tab - checking if 180 seconds passed');
+        this.checkIf180SecondsPassed();
       }
     });
   }
@@ -640,139 +612,35 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private setupMobileSafariBackup() {
-    // Set up a backup mechanism that works even when tab is inactive
-    // This uses timestamp-based tracking instead of setTimeout
-    const checkIdleTimeout = () => {
-      if (this.idleTime.popupShownAt && this.showIdlePopup) {
-        const now = Date.now();
-        const timeSincePopup = now - this.idleTime.popupShownAt;
-        
-        console.log('🔍 Background idle check:', {
-          timeSincePopup: timeSincePopup,
-          threshold: this.idleTime.idleThreshold,
-          shouldSend: timeSincePopup >= this.idleTime.idleThreshold
-        });
-        
-        if (timeSincePopup >= this.idleTime.idleThreshold) {
-          console.log('⏰ Background: 180 seconds total inactivity - sending analytics');
-          this.sendTrackingData('idle_timeout_180_seconds');
-          this.showIdlePopup = false;
-          document.body.style.overflow = 'auto';
-          
-          // Clear the popup timer since we're handling it manually
-          if (this.idlePopupTimer) {
-            clearTimeout(this.idlePopupTimer);
-            this.idlePopupTimer = null;
-          }
-        }
-      }
-    };
-    
-    // Check immediately when tab becomes visible
+    // Simple backup: Check if 180 seconds have passed when tab becomes visible
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        console.log('👋 Tab became visible - checking idle timeout');
-        setTimeout(checkIdleTimeout, 100); // Small delay to ensure state is updated
+        console.log('👋 Tab became visible - checking if 180 seconds passed');
+        this.checkIf180SecondsPassed();
       }
     });
     
-    // Also check on page focus (additional mobile Safari trigger)
+    // Also check on page focus
     window.addEventListener('focus', () => {
-      console.log('👋 Page focused - checking idle timeout');
-      setTimeout(checkIdleTimeout, 100);
+      console.log('👋 Page focused - checking if 180 seconds passed');
+      this.checkIf180SecondsPassed();
+    });
+  }
+
+  private checkIf180SecondsPassed() {
+    const now = Date.now();
+    const timeSinceLastActivity = now - this.idleTime.lastActivity;
+    
+    console.log('🔍 Checking if 180 seconds passed:', {
+      timeSinceLastActivity: timeSinceLastActivity,
+      threshold: this.idleTime.idleThreshold,
+      shouldSend: timeSinceLastActivity >= this.idleTime.idleThreshold
     });
     
-    // Aggressive background tracking - works even when tab is inactive
-    // Store the timeout check in localStorage so it persists across tab switches
-    const storeTimeoutCheck = () => {
-      if (this.idleTime.popupShownAt && this.showIdlePopup) {
-        const timeoutData = {
-          popupShownAt: this.idleTime.popupShownAt,
-          sessionId: this.sessionId,
-          timestamp: Date.now()
-        };
-        
-        try {
-          localStorage.setItem('nevys_idle_timeout', JSON.stringify(timeoutData));
-          console.log('💾 Stored idle timeout check:', timeoutData);
-        } catch (e) {
-          console.warn('⚠️ Could not store timeout check:', e);
-        }
-      }
-    };
-    
-    // Store timeout check immediately when popup is shown
-    storeTimeoutCheck();
-    
-    // Periodic check every 5 seconds (more frequent for better reliability)
-    const periodicCheck = setInterval(() => {
-      if (this.idleTime.popupShownAt && this.showIdlePopup) {
-        const now = Date.now();
-        const timeSincePopup = now - this.idleTime.popupShownAt;
-        
-        console.log('🔄 Periodic background check:', {
-          timeSincePopup: timeSincePopup,
-          threshold: this.idleTime.idleThreshold,
-          shouldSend: timeSincePopup >= this.idleTime.idleThreshold
-        });
-        
-        if (timeSincePopup >= this.idleTime.idleThreshold) {
-          console.log('⏰ Periodic check: 180 seconds total inactivity - sending analytics');
-          this.sendTrackingData('idle_timeout_180_seconds');
-          this.showIdlePopup = false;
-          document.body.style.overflow = 'auto';
-          clearInterval(periodicCheck);
-          
-          // Clear stored timeout check
-          localStorage.removeItem('nevys_idle_timeout');
-          
-          // Clear the popup timer
-          if (this.idlePopupTimer) {
-            clearTimeout(this.idlePopupTimer);
-            this.idlePopupTimer = null;
-          }
-        } else {
-          // Update stored timeout check
-          storeTimeoutCheck();
-        }
-      } else {
-        // Clear interval if popup is no longer showing
-        clearInterval(periodicCheck);
-        localStorage.removeItem('nevys_idle_timeout');
-      }
-    }, 5000); // Check every 5 seconds
-    
-    // Universal backup: Check on any user interaction (works on all browsers)
-    const universalBackupEvents = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart', 'click', 'keydown'];
-    const universalBackup = () => {
-      if (this.idleTime.popupShownAt && this.showIdlePopup) {
-        const now = Date.now();
-        const timeSincePopup = now - this.idleTime.popupShownAt;
-        
-        if (timeSincePopup >= this.idleTime.idleThreshold) {
-          console.log('⏰ Universal backup: 180 seconds total inactivity - sending analytics');
-          this.sendTrackingData('idle_timeout_180_seconds');
-          this.showIdlePopup = false;
-          document.body.style.overflow = 'auto';
-          
-          // Clear the popup timer
-          if (this.idlePopupTimer) {
-            clearTimeout(this.idlePopupTimer);
-            this.idlePopupTimer = null;
-          }
-          
-          // Remove universal backup listeners
-          universalBackupEvents.forEach(event => {
-            document.removeEventListener(event, universalBackup);
-          });
-        }
-      }
-    };
-    
-    // Add universal backup listeners
-    universalBackupEvents.forEach(event => {
-      document.addEventListener(event, universalBackup, { once: true });
-    });
+    if (timeSinceLastActivity >= this.idleTime.idleThreshold) {
+      console.log('⏰ 180 seconds total inactivity detected - sending analytics');
+      this.sendTrackingData('idle_timeout_180_seconds');
+    }
   }
 
   private setupScrollDetection() {
@@ -807,6 +675,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
 
   private sendTrackingData(trigger: string) {
+    // Use sendBeacon for reliable transmission when user is away
+    if (document.hidden && (trigger === 'idle_timeout_180_seconds' || trigger === 'page_unload')) {
+      console.log('📡 User is away - using sendBeacon for reliable data transmission');
+      this.sendTrackingDataWithBeacon(trigger);
+      return;
+    }
     // Stop all active timers
     Object.keys(this.sectionTimers).forEach(sectionId => {
       if (this.sectionTimers[sectionId].isActive) {
@@ -2204,6 +2078,42 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  private checkStoredTimeoutAndSendIfNeeded() {
+    try {
+      const stored = localStorage.getItem('nevys_idle_timeout');
+      if (!stored) return;
+      
+      const timeoutData = JSON.parse(stored);
+      
+      // Only check if it's the same session
+      if (timeoutData.sessionId !== this.sessionId) {
+        localStorage.removeItem('nevys_idle_timeout');
+        return;
+      }
+      
+      const now = Date.now();
+      const timeSincePopup = now - timeoutData.popupShownAt;
+      
+      console.log('🔍 AGGRESSIVE stored timeout check:', {
+        timeSincePopup: timeSincePopup,
+        threshold: this.idleTime.idleThreshold,
+        shouldSend: timeSincePopup >= this.idleTime.idleThreshold,
+        userAway: document.hidden
+      });
+      
+      if (timeSincePopup >= this.idleTime.idleThreshold) {
+        // 180 seconds total inactivity - send analytics immediately
+        console.log('⏰ AGGRESSIVE stored timeout: 180 seconds total inactivity - sending analytics NOW');
+        this.sendTrackingData('idle_timeout_180_seconds');
+        localStorage.removeItem('nevys_idle_timeout');
+      }
+      
+    } catch (e) {
+      console.warn('⚠️ Could not check stored timeout data aggressively:', e);
+      localStorage.removeItem('nevys_idle_timeout');
+    }
+  }
+
   private checkStoredIdleTimeoutData() {
     try {
       const stored = localStorage.getItem('nevys_idle_timeout');
@@ -2282,6 +2192,101 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('❌ Zapier connection test failed:', error);
       console.log('🔧 Check your webhook URL and network connection');
+    }
+  }
+
+  private sendTrackingDataWithBeacon(trigger: string) {
+    try {
+      // Calculate form interaction time
+      let formInteractionTime = 0;
+      if (this.formStarted && this.formStartTime > 0) {
+        formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+      }
+
+      // Prepare events data (convert to seconds)
+      const events = {
+        session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+        session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+        session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+        session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+        session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+        session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+        session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+        session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+        form_started: this.formStarted,
+        form_submitted: this.formSubmitted,
+        form_interaction_time: formInteractionTime
+      };
+
+      // Prepare tracking data
+      const trackingData = {
+        selectedResponse: this.getChoiceEnglish(this.selectedChoice),
+        cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+        otherReason: this.otherCancellationReason || '',
+        marketingConsent: this.selectedSubscription,
+        englishImpact: 'Not Applicable',
+        preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
+        paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
+        pricingResponse: this.selectedPlan || 'Not Selected',
+        name: this.urlParams.name,
+        email: this.urlParams.email,
+        campaignName: this.urlParams.campaignName,
+        adsetName: this.urlParams.adsetName,
+        adName: this.urlParams.adName,
+        fbClickId: this.urlParams.fbClickId,
+        sessionId: this.sessionId,
+        trigger: trigger,
+        timestamp: new Date().toISOString(),
+        totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
+        events: events,
+        userAgent: navigator.userAgent,
+        pageUrl: window.location.href,
+        formStarted: this.formStarted,
+        formSubmitted: this.formSubmitted,
+        formInteractionTime: formInteractionTime
+      };
+
+      // Create URL parameters for the webhook
+      const params = new URLSearchParams();
+      Object.keys(trackingData).forEach(key => {
+        const value = (trackingData as any)[key];
+        if (value !== null && value !== undefined) {
+          if (typeof value === 'object') {
+            params.set(key, JSON.stringify(value));
+          } else {
+            params.set(key, value.toString());
+          }
+        }
+      });
+
+      const webhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1m4k02/';
+      const fullUrl = `${webhookUrl}?${params.toString()}`;
+      
+      console.log('📡 Using sendBeacon for reliable transmission (user away):', fullUrl);
+      
+      // Use sendBeacon for reliable transmission
+      const success = navigator.sendBeacon(fullUrl);
+      
+      if (success) {
+        console.log('✅ Data sent successfully via sendBeacon (user away)');
+      } else {
+        console.warn('⚠️ sendBeacon failed, trying fetch fallback');
+        // Fallback to fetch
+        fetch(fullUrl, { method: 'GET', keepalive: true })
+          .then(response => {
+            if (response.ok) {
+              console.log('✅ Fallback method succeeded (user away)');
+            } else {
+              console.error('❌ Fallback method failed (user away):', response.status);
+            }
+          })
+          .catch(error => {
+            console.error('❌ Fallback method error (user away):', error);
+          });
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in sendTrackingDataWithBeacon:', error);
     }
   }
 
