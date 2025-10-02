@@ -652,111 +652,22 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private setupBackgroundTracking() {
-    // Store last activity time in localStorage for persistence
-    const storeLastActivity = () => {
-      try {
-        const activityData = {
-          lastActivity: this.idleTime.lastActivity,
-          sessionId: this.sessionId,
-          timestamp: Date.now()
-        };
-        localStorage.setItem('nevys_last_activity', JSON.stringify(activityData));
-        console.log('💾 Stored last activity:', activityData);
-      } catch (e) {
-        console.warn('⚠️ Could not store last activity:', e);
-      }
-    };
-
-    // Store activity when user leaves
+    // SIMPLE APPROACH: Just check when user returns
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        storeLastActivity();
-        console.log('👋 User left tab - stored activity data');
-      } else {
+      if (!document.hidden) {
         // User returned - check if 180 seconds have passed
         console.log('👋 User returned to tab - checking if 180 seconds passed');
-        this.checkStoredActivityAndSendIfNeeded();
+        this.checkIf180SecondsPassed();
       }
     });
 
-    // Also store on page unload
-    window.addEventListener('beforeunload', () => {
-      storeLastActivity();
+    // Also check on page focus
+    window.addEventListener('focus', () => {
+      console.log('👋 Page focused - checking if 180 seconds passed');
+      this.checkIf180SecondsPassed();
     });
-
-    // AGGRESSIVE: Check every 5 seconds even when tab is inactive
-    setInterval(() => {
-      const now = Date.now();
-      const timeSinceLastActivity = now - this.idleTime.lastActivity;
-      
-      console.log('🔄 AGGRESSIVE background check:', {
-        timeSinceLastActivity: timeSinceLastActivity,
-        threshold: 180000,
-        shouldSend: timeSinceLastActivity >= 180000,
-        userAway: document.hidden
-      });
-      
-      if (timeSinceLastActivity >= 180000) {
-        console.log('⏰ AGGRESSIVE: 180 seconds total inactivity - sending analytics NOW');
-        this.sendTrackingData('idle_timeout_180_seconds');
-      }
-    }, 5000); // Check every 5 seconds
   }
 
-  private checkStoredActivityAndSendIfNeeded() {
-    try {
-      const stored = localStorage.getItem('nevys_last_activity');
-      if (!stored) return;
-      
-      const activityData = JSON.parse(stored);
-      
-      // Only check if it's the same session
-      if (activityData.sessionId !== this.sessionId) {
-        localStorage.removeItem('nevys_last_activity');
-        return;
-      }
-      
-      const now = Date.now();
-      const timeSinceLastActivity = now - activityData.lastActivity;
-      
-      console.log('🔍 Checking stored activity data:', {
-        timeSinceLastActivity: timeSinceLastActivity,
-        threshold: 180000,
-        shouldSend: timeSinceLastActivity >= 180000
-      });
-      
-      if (timeSinceLastActivity >= 180000) {
-        console.log('⏰ Stored activity: 180 seconds total inactivity - sending analytics');
-        this.sendTrackingData('idle_timeout_180_seconds');
-        localStorage.removeItem('nevys_last_activity');
-      } else if (timeSinceLastActivity >= 90000) {
-        // Show popup if 90 seconds have passed
-        if (!this.showIdlePopup) {
-          this.showIdlePopup = true;
-          document.body.style.overflow = 'hidden';
-          console.log('💬 Showing idle popup - asking if user is still there');
-          
-          // Start timer for popup interaction
-          this.idlePopupTimer = setTimeout(() => {
-            console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-            this.sendTrackingData('idle_timeout_180_seconds');
-          }, 90000); // Another 90 seconds
-        }
-        
-        // Update the stored activity with current time
-        this.idleTime.lastActivity = activityData.lastActivity;
-        console.log('🔄 Updated last activity from stored data');
-      } else {
-        // Update the stored activity with current time
-        this.idleTime.lastActivity = activityData.lastActivity;
-        console.log('🔄 Updated last activity from stored data');
-      }
-      
-    } catch (e) {
-      console.warn('⚠️ Could not check stored activity data:', e);
-      localStorage.removeItem('nevys_last_activity');
-    }
-  }
 
   private setupScrollDetection() {
     window.addEventListener('scroll', () => {
@@ -790,12 +701,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
 
   private sendTrackingData(trigger: string) {
-    // Use sendBeacon for reliable transmission when user is away
-    if (document.hidden && trigger === 'idle_timeout_180_seconds') {
-      console.log('📡 User is away - using sendBeacon for reliable data transmission');
-      this.sendTrackingDataWithBeacon(trigger);
-      return;
-    }
     // Stop all active timers
     Object.keys(this.sectionTimers).forEach(sectionId => {
       if (this.sectionTimers[sectionId].isActive) {
@@ -2310,100 +2215,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private sendTrackingDataWithBeacon(trigger: string) {
-    try {
-      // Calculate form interaction time
-      let formInteractionTime = 0;
-      if (this.formStarted && this.formStartTime > 0) {
-        formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
-      }
-
-      // Prepare events data (convert to seconds)
-      const events = {
-        session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
-        session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
-        session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
-        session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
-        session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
-        session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
-        session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
-        session_idle_time_duration: Math.round(this.idleTime.total / 1000),
-        form_started: this.formStarted,
-        form_submitted: this.formSubmitted,
-        form_interaction_time: formInteractionTime
-      };
-
-      // Prepare tracking data
-      const trackingData = {
-        selectedResponse: this.getChoiceEnglish(this.selectedChoice),
-        cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
-        otherReason: this.otherCancellationReason || '',
-        marketingConsent: this.selectedSubscription,
-        englishImpact: 'Not Applicable',
-        preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
-        paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
-        pricingResponse: this.selectedPlan || 'Not Selected',
-        name: this.urlParams.name,
-        email: this.urlParams.email,
-        campaignName: this.urlParams.campaignName,
-        adsetName: this.urlParams.adsetName,
-        adName: this.urlParams.adName,
-        fbClickId: this.urlParams.fbClickId,
-        sessionId: this.sessionId,
-        trigger: trigger,
-        timestamp: new Date().toISOString(),
-        totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
-        events: events,
-        userAgent: navigator.userAgent,
-        pageUrl: window.location.href,
-        formStarted: this.formStarted,
-        formSubmitted: this.formSubmitted,
-        formInteractionTime: formInteractionTime
-      };
-
-      // Create URL parameters for the webhook
-      const params = new URLSearchParams();
-      Object.keys(trackingData).forEach(key => {
-        const value = (trackingData as any)[key];
-        if (value !== null && value !== undefined) {
-          if (typeof value === 'object') {
-            params.set(key, JSON.stringify(value));
-          } else {
-            params.set(key, value.toString());
-          }
-        }
-      });
-
-      const webhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1m4k02/';
-      const fullUrl = `${webhookUrl}?${params.toString()}`;
-      
-      console.log('📡 Using sendBeacon for reliable transmission (user away):', fullUrl);
-      
-      // Use sendBeacon for reliable transmission
-      const success = navigator.sendBeacon(fullUrl);
-      
-      if (success) {
-        console.log('✅ Data sent successfully via sendBeacon (user away)');
-      } else {
-        console.warn('⚠️ sendBeacon failed, trying fetch fallback');
-        // Fallback to fetch
-        fetch(fullUrl, { method: 'GET', keepalive: true })
-          .then(response => {
-            if (response.ok) {
-              console.log('✅ Fallback method succeeded (user away)');
-            } else {
-              console.error('❌ Fallback method failed (user away):', response.status);
-            }
-          })
-          .catch(error => {
-            console.error('❌ Fallback method error (user away):', error);
-          });
-      }
-      
-    } catch (error) {
-      console.error('❌ Error in sendTrackingDataWithBeacon:', error);
-    }
-  }
 
   private sendSessionDataToZapier() {
     // Determine user interaction level
