@@ -461,6 +461,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
           this.sendTrackingData('idle_timeout_180_seconds');
         }, this.idleTime.idleThreshold); // Another 90 seconds
+        
+        // Also set up a backup check that runs when tab becomes visible
+        // This handles mobile Safari where setTimeout might not fire
+        this.setupMobileSafariBackup();
       }, this.idleTime.idleThreshold);
     }
   }
@@ -616,6 +620,107 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.warn('⚠️ Could not check stored idle timeout:', e);
       localStorage.removeItem('nevys_idle_state');
     }
+  }
+
+  private setupMobileSafariBackup() {
+    // Set up a backup mechanism for mobile Safari
+    // This runs when the tab becomes visible again
+    const checkIdleTimeout = () => {
+      if (this.idleTime.popupShownAt && this.showIdlePopup) {
+        const now = Date.now();
+        const timeSincePopup = now - this.idleTime.popupShownAt;
+        
+        console.log('🔍 Mobile Safari backup check:', {
+          timeSincePopup: timeSincePopup,
+          threshold: this.idleTime.idleThreshold,
+          shouldSend: timeSincePopup >= this.idleTime.idleThreshold
+        });
+        
+        if (timeSincePopup >= this.idleTime.idleThreshold) {
+          console.log('⏰ Mobile Safari: 180 seconds total inactivity - sending analytics via backup');
+          this.sendTrackingData('idle_timeout_180_seconds');
+          this.showIdlePopup = false;
+          document.body.style.overflow = 'auto';
+          
+          // Clear the popup timer since we're handling it manually
+          if (this.idlePopupTimer) {
+            clearTimeout(this.idlePopupTimer);
+            this.idlePopupTimer = null;
+          }
+        }
+      }
+    };
+    
+    // Check immediately when tab becomes visible
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        console.log('👋 Tab became visible - checking idle timeout');
+        setTimeout(checkIdleTimeout, 100); // Small delay to ensure state is updated
+      }
+    });
+    
+    // Also check on page focus (additional mobile Safari trigger)
+    window.addEventListener('focus', () => {
+      console.log('👋 Page focused - checking idle timeout');
+      setTimeout(checkIdleTimeout, 100);
+    });
+    
+    // Periodic check every 10 seconds as additional backup
+    const periodicCheck = setInterval(() => {
+      if (this.idleTime.popupShownAt && this.showIdlePopup) {
+        const now = Date.now();
+        const timeSincePopup = now - this.idleTime.popupShownAt;
+        
+        if (timeSincePopup >= this.idleTime.idleThreshold) {
+          console.log('⏰ Periodic check: 180 seconds total inactivity - sending analytics');
+          this.sendTrackingData('idle_timeout_180_seconds');
+          this.showIdlePopup = false;
+          document.body.style.overflow = 'auto';
+          clearInterval(periodicCheck);
+          
+          // Clear the popup timer
+          if (this.idlePopupTimer) {
+            clearTimeout(this.idlePopupTimer);
+            this.idlePopupTimer = null;
+          }
+        }
+      } else {
+        // Clear interval if popup is no longer showing
+        clearInterval(periodicCheck);
+      }
+    }, 10000); // Check every 10 seconds
+    
+    // Universal backup: Check on any user interaction (works on all browsers)
+    const universalBackupEvents = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart', 'click', 'keydown'];
+    const universalBackup = () => {
+      if (this.idleTime.popupShownAt && this.showIdlePopup) {
+        const now = Date.now();
+        const timeSincePopup = now - this.idleTime.popupShownAt;
+        
+        if (timeSincePopup >= this.idleTime.idleThreshold) {
+          console.log('⏰ Universal backup: 180 seconds total inactivity - sending analytics');
+          this.sendTrackingData('idle_timeout_180_seconds');
+          this.showIdlePopup = false;
+          document.body.style.overflow = 'auto';
+          
+          // Clear the popup timer
+          if (this.idlePopupTimer) {
+            clearTimeout(this.idlePopupTimer);
+            this.idlePopupTimer = null;
+          }
+          
+          // Remove universal backup listeners
+          universalBackupEvents.forEach(event => {
+            document.removeEventListener(event, universalBackup);
+          });
+        }
+      }
+    };
+    
+    // Add universal backup listeners
+    universalBackupEvents.forEach(event => {
+      document.addEventListener(event, universalBackup, { once: true });
+    });
   }
 
   private setupScrollDetection() {
