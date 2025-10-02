@@ -464,8 +464,98 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   private setupPageUnloadTracking() {
     window.addEventListener('beforeunload', () => {
       console.log('🚪 Page unloading - sending tracking data');
+      this.storeIdleState(); // Store state before sending data
       this.sendTrackingData('page_unload');
     });
+    
+    // Handle page visibility changes (tab switching, app switching)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // User left the tab/app - store current idle state
+        this.storeIdleState();
+        console.log('👋 User left tab - storing idle state');
+      } else {
+        // User returned to tab - check if we should continue idle tracking
+        this.restoreIdleState();
+        console.log('👋 User returned to tab - checking idle state');
+      }
+    });
+  }
+
+  private storeIdleState() {
+    const idleState = {
+      lastActivity: this.idleTime.lastActivity,
+      total: this.idleTime.total,
+      isIdle: this.idleTime.isIdle,
+      timestamp: Date.now(),
+      sessionId: this.sessionId
+    };
+    
+    try {
+      localStorage.setItem('nevys_idle_state', JSON.stringify(idleState));
+      console.log('💾 Idle state stored:', idleState);
+    } catch (e) {
+      console.warn('⚠️ Could not store idle state:', e);
+    }
+  }
+
+  private restoreIdleState() {
+    try {
+      const stored = localStorage.getItem('nevys_idle_state');
+      if (!stored) return;
+      
+      const idleState = JSON.parse(stored);
+      
+      // Only restore if it's the same session
+      if (idleState.sessionId !== this.sessionId) {
+        localStorage.removeItem('nevys_idle_state');
+        return;
+      }
+      
+      const now = Date.now();
+      const timeAway = now - idleState.timestamp;
+      
+      console.log('🔄 Restoring idle state:', {
+        timeAway: timeAway,
+        wasIdle: idleState.isIdle,
+        storedLastActivity: idleState.lastActivity
+      });
+      
+      // If user was idle when they left, add the time away to total idle time
+      if (idleState.isIdle) {
+        this.idleTime.total = idleState.total + timeAway;
+        console.log('⏰ User was idle when they left - adding time away to total');
+      } else {
+        // If user wasn't idle, check if they've been away long enough to be considered idle
+        const totalInactiveTime = now - idleState.lastActivity;
+        if (totalInactiveTime >= this.idleTime.idleThreshold) {
+          // They've been inactive long enough - show popup immediately
+          this.idleTime.isIdle = true;
+          this.idleTime.total = idleState.total + (totalInactiveTime - this.idleTime.idleThreshold);
+          this.showIdlePopup = true;
+          document.body.style.overflow = 'hidden';
+          console.log('💬 User returned after long inactivity - showing popup immediately');
+          
+          // Start popup timer for additional 90 seconds
+          this.idlePopupTimer = setTimeout(() => {
+            console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+            this.sendTrackingData('idle_timeout_180_seconds');
+          }, this.idleTime.idleThreshold);
+        } else {
+          // Not idle yet - continue normal tracking
+          this.idleTime.lastActivity = idleState.lastActivity;
+          this.idleTime.total = idleState.total;
+          this.resetIdleTimer();
+        }
+      }
+      
+      // Clean up stored state
+      localStorage.removeItem('nevys_idle_state');
+      
+    } catch (e) {
+      console.warn('⚠️ Could not restore idle state:', e);
+      localStorage.removeItem('nevys_idle_state');
+    }
   }
 
   private setupScrollDetection() {
