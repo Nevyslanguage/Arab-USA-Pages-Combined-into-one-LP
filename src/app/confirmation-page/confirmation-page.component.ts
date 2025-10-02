@@ -59,7 +59,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   private sessionId: string = '';
   private sessionStartTime: number = 0;
   private sectionTimers: { [key: string]: { totalTime: number; isActive: boolean; currentSessionStart?: number } } = {};
-  private idleTime: { total: number; lastActivity: number; isIdle: boolean; idleThreshold: number } = {
+  private idleTime: { total: number; lastActivity: number; isIdle: boolean; idleThreshold: number; popupShownAt?: number } = {
     total: 0,
     lastActivity: 0,
     isIdle: false,
@@ -243,6 +243,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.setupIntersectionObservers();
     this.setupIdleTracking();
     this.setupPageUnloadTracking();
+    this.checkStoredIdleTimeout();
     this.setupScrollDetection();
   }
 
@@ -451,6 +452,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         document.body.style.overflow = 'hidden';
         console.log('💬 Showing idle popup - asking if user is still there');
         
+        // Store when popup was shown for timestamp-based tracking
+        this.idleTime.popupShownAt = Date.now();
+        
         // Start 90-second timer for popup interaction
         // If user doesn't interact with popup within 90 seconds, send analytics
         this.idlePopupTimer = setTimeout(() => {
@@ -487,6 +491,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       lastActivity: this.idleTime.lastActivity,
       total: this.idleTime.total,
       isIdle: this.idleTime.isIdle,
+      popupShownAt: this.idleTime.popupShownAt,
       timestamp: Date.now(),
       sessionId: this.sessionId
     };
@@ -524,7 +529,29 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       // If user was idle when they left, add the time away to total idle time
       if (idleState.isIdle) {
         this.idleTime.total = idleState.total + timeAway;
+        this.idleTime.popupShownAt = idleState.popupShownAt;
         console.log('⏰ User was idle when they left - adding time away to total');
+        
+        // Check if popup was shown and if 90 seconds have passed since then
+        if (idleState.popupShownAt) {
+          const timeSincePopup = now - idleState.popupShownAt;
+          if (timeSincePopup >= this.idleTime.idleThreshold) {
+            // 180 seconds total inactivity - send analytics immediately
+            console.log('⏰ 180 seconds total inactivity detected - sending analytics immediately');
+            this.sendTrackingData('idle_timeout_180_seconds');
+            return;
+          } else {
+            // Show popup and continue timer
+            this.showIdlePopup = true;
+            document.body.style.overflow = 'hidden';
+            const remainingTime = this.idleTime.idleThreshold - timeSincePopup;
+            this.idlePopupTimer = setTimeout(() => {
+              console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+              this.sendTrackingData('idle_timeout_180_seconds');
+            }, remainingTime);
+            console.log('💬 User returned while popup was active - continuing timer');
+          }
+        }
       } else {
         // If user wasn't idle, check if they've been away long enough to be considered idle
         const totalInactiveTime = now - idleState.lastActivity;
@@ -554,6 +581,39 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       
     } catch (e) {
       console.warn('⚠️ Could not restore idle state:', e);
+      localStorage.removeItem('nevys_idle_state');
+    }
+  }
+
+  private checkStoredIdleTimeout() {
+    try {
+      const stored = localStorage.getItem('nevys_idle_state');
+      if (!stored) return;
+      
+      const idleState = JSON.parse(stored);
+      
+      // Only check if it's the same session
+      if (idleState.sessionId !== this.sessionId) {
+        localStorage.removeItem('nevys_idle_state');
+        return;
+      }
+      
+      const now = Date.now();
+      
+      // Check if popup was shown and if 90 seconds have passed since then
+      if (idleState.popupShownAt) {
+        const timeSincePopup = now - idleState.popupShownAt;
+        if (timeSincePopup >= this.idleTime.idleThreshold) {
+          // 180 seconds total inactivity - send analytics immediately
+          console.log('⏰ 180 seconds total inactivity detected on page load - sending analytics immediately');
+          this.sendTrackingData('idle_timeout_180_seconds');
+          localStorage.removeItem('nevys_idle_state');
+          return;
+        }
+      }
+      
+    } catch (e) {
+      console.warn('⚠️ Could not check stored idle timeout:', e);
       localStorage.removeItem('nevys_idle_state');
     }
   }
