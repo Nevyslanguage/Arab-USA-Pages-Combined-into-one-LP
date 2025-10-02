@@ -66,6 +66,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     idleThreshold: 90000 // 90 seconds - very reasonable for reading content
   };
   private idleTimer: any = null;
+  private idlePopupTimer: any = null;
   
   // Form interaction tracking
   private formStarted: boolean = false;
@@ -128,7 +129,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   // Idle time popup
   showIdlePopup: boolean = false;
-  private idlePopupTimer: any = null;
 
   // Sticky header
   showStickyHeader: boolean = false;
@@ -442,7 +442,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       clearTimeout(this.idlePopupTimer);
     }
     
-    // Set new idle timer - show popup after 10 seconds of inactivity
+    // Set new idle timer - show popup after 90 seconds of inactivity
     // Only start timer if thank you screen is not showing
     if (!this.showThankYouScreen) {
       this.idleTimer = setTimeout(() => {
@@ -450,6 +450,13 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         this.showIdlePopup = true;
         document.body.style.overflow = 'hidden';
         console.log('💬 Showing idle popup - asking if user is still there');
+        
+        // Start 90-second timer for popup interaction
+        // If user doesn't interact with popup within 90 seconds, send analytics
+        this.idlePopupTimer = setTimeout(() => {
+          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
+          this.sendTrackingData('idle_timeout_180_seconds');
+        }, this.idleTime.idleThreshold); // Another 90 seconds
       }, this.idleTime.idleThreshold);
     }
   }
@@ -1771,6 +1778,13 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   closeIdlePopup() {
     this.showIdlePopup = false;
     document.body.style.overflow = 'auto';
+    
+    // Clear the popup timer since user interacted
+    if (this.idlePopupTimer) {
+      clearTimeout(this.idlePopupTimer);
+      this.idlePopupTimer = null;
+    }
+    
     // Reset the idle timer to start fresh
     this.resetIdleTimer();
     console.log('💬 Idle popup closed - user is active again');
