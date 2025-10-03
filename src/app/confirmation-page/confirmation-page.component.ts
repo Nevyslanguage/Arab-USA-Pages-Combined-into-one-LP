@@ -12,7 +12,7 @@ import { ZapierService, FormData } from '../services/zapier.service';
 })
 export class ConfirmationPageComponent implements OnInit, OnDestroy {
   // Development flag to disable Zapier calls during development
-  private readonly isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  private readonly isDevelopment = false; // Temporarily disabled for testing
   
   constructor(private zapierService: ZapierService) {}
   selectedChoice: string = '';
@@ -59,13 +59,14 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   private sessionId: string = '';
   private sessionStartTime: number = 0;
   private sectionTimers: { [key: string]: { totalTime: number; isActive: boolean; currentSessionStart?: number } } = {};
-  private idleTime: { total: number; lastActivity: number; isIdle: boolean; idleThreshold: number } = {
+  private idleTime: { total: number; lastActivity: number; isIdle: boolean; idleThreshold: number; popupShownAt?: number } = {
     total: 0,
     lastActivity: 0,
     isIdle: false,
-    idleThreshold: 90000 // 90 seconds - very reasonable for reading content
+    idleThreshold: 60000 // 60 seconds total inactivity
   };
   private idleTimer: any = null;
+  private idlePopupTimer: any = null;
   
   // Form interaction tracking
   private formStarted: boolean = false;
@@ -128,7 +129,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   // Idle time popup
   showIdlePopup: boolean = false;
-  private idlePopupTimer: any = null;
 
   // Sticky header
   showStickyHeader: boolean = false;
@@ -242,8 +242,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.initializeTracking();
     this.setupIntersectionObservers();
     this.setupIdleTracking();
-    this.setupPageUnloadTracking();
     this.setupScrollDetection();
+    
+    // Start the simple 60-second timer
+    this.startSimpleIdleTracking();
   }
 
   ngOnDestroy() {
@@ -383,7 +385,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     activityEvents.forEach(event => {
       document.addEventListener(event, () => {
-        this.resetIdleTimer();
+        this.startSimpleIdleTracking();
       }, true);
     });
     
@@ -398,7 +400,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           // User is actively viewing a section - consider this as activity
-          this.resetIdleTimer();
+          this.startSimpleIdleTracking();
           console.log('👀 User actively viewing section:', entry.target.id);
         }
       });
@@ -415,51 +417,258 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }, 100);
   }
 
-  private resetIdleTimer() {
-    // Don't reset timer if idle popup is already showing or thank you screen is showing
-    if (this.showIdlePopup || this.showThankYouScreen) {
+  private startSimpleIdleTracking() {
+    // Store page load time for background tracking
+    const pageLoadTime = Date.now();
+    localStorage.setItem('nevys_page_load_time', pageLoadTime.toString());
+    localStorage.setItem('nevys_session_id', this.sessionId);
+    
+    console.log('💾 Simple idle tracking started - page load time stored');
+    
+    // Start 60-second timer to show popup
+    this.idleTimer = setTimeout(() => {
+      this.showIdlePopup = true;
+      this.idleTime.popupShownAt = Date.now();
+      document.body.style.overflow = 'hidden';
+      console.log('💬 Idle popup shown after 60 seconds');
+    }, 60000); // 60 seconds
+    
+    // Track when user leaves the page
+    let userLeftTime: number | null = null;
+    
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // User left the page - record the time
+        userLeftTime = Date.now();
+        console.log('👋 User left tab at:', new Date(userLeftTime).toISOString());
+        
+        // Start checking if they stay away for 60 seconds
+        const checkAwayTimer = setInterval(() => {
+          if (!document.hidden) {
+            // User came back - cancel the timer
+            console.log('👋 User returned to tab - canceling away timer');
+            clearInterval(checkAwayTimer);
+            userLeftTime = null;
+            return;
+          }
+          
+          // Check if 60 seconds have passed since they left
+          if (userLeftTime && (Date.now() - userLeftTime) >= 60000) {
+            console.log('⏰ User has been away for 60 seconds - sending analytics');
+            this.sendIdleAnalytics();
+            clearInterval(checkAwayTimer);
+            userLeftTime = null;
+          }
+        }, 1000); // Check every second
+        
+      } else {
+        // User returned to the page
+        if (userLeftTime) {
+          console.log('👋 User returned to tab - canceling away timer');
+          userLeftTime = null;
+        }
+      }
+    });
+    
+    // Also check on page unload (user closed tab/window)
+    window.addEventListener('beforeunload', () => {
+      console.log('🚪 Page unloading - sending analytics immediately');
+      this.sendIdleAnalytics();
+    });
+  }
+  
+
+
+
+
+
+
+  private sendIdleAnalytics() {
+    console.log('🚀 sendIdleAnalytics called - preparing to send data');
+    
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds) - same as your existing pattern
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime
+    };
+
+    // Check if in development mode
+    if (this.isDevelopment) {
+      console.log('🔧 Development mode: Logging idle analytics (no Zapier API call)');
+      console.log('📊 Idle analytics data that would be sent:');
+      console.log({
+        trigger: 'user_left_and_stayed_away_60_seconds',
+        sessionId: this.sessionId,
+        timestamp: new Date().toISOString(),
+        name: this.urlParams.name || '',
+        email: this.urlParams.email || '',
+        campaignName: this.urlParams.campaignName || '',
+        adsetName: this.urlParams.adsetName || '',
+        adName: this.urlParams.adName || '',
+        fbClickId: this.urlParams.fbClickId || '',
+        userAgent: navigator.userAgent,
+        pageUrl: window.location.href,
+        totalSessionTime: Math.floor((Date.now() - this.sessionStartTime) / 1000),
+        events: events
+      });
       return;
     }
+
+    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1m4k02/';
     
-    const now = Date.now();
+    // Prepare URL parameters (matching your existing pattern)
+    const params = new URLSearchParams();
+    params.set('trigger', 'user_left_and_stayed_away_60_seconds');
+    params.set('sessionId', this.sessionId);
+    params.set('timestamp', new Date().toISOString());
+    params.set('name', this.urlParams.name || '');
+    params.set('email', this.urlParams.email || '');
+    params.set('campaignName', this.urlParams.campaignName || '');
+    params.set('adsetName', this.urlParams.adsetName || '');
+    params.set('adName', this.urlParams.adName || '');
+    params.set('fbClickId', this.urlParams.fbClickId || '');
+    params.set('userAgent', navigator.userAgent);
+    params.set('pageUrl', window.location.href);
+    params.set('totalSessionTime', Math.floor((Date.now() - this.sessionStartTime) / 1000).toString());
     
-    // If user was idle, add the idle time to total
-    if (this.idleTime.isIdle) {
-      const idlePeriod = now - this.idleTime.lastActivity;
-      this.idleTime.total += idlePeriod;
-      console.log('🔄 User activity detected. Idle period:', idlePeriod, 'ms, Total idle:', this.idleTime.total, 'ms');
-    }
+    // Add events data as JSON string (matching your existing pattern)
+    params.set('events', JSON.stringify(events));
     
-    // Reset idle state
-    this.idleTime.isIdle = false;
-    this.idleTime.lastActivity = now;
+    // Add formatted description (matching your existing pattern)
+    const description = this.formatIdleAnalyticsDescription(events);
+    params.set('description', description);
+    params.set('notes', description); // Alternative field name
+    params.set('comments', description); // Alternative field name
     
-    // Clear existing timers
-    if (this.idleTimer) {
-      clearTimeout(this.idleTimer);
-    }
-    if (this.idlePopupTimer) {
-      clearTimeout(this.idlePopupTimer);
-    }
+    const fullUrl = `${webhookUrl}?${params.toString()}`;
     
-    // Set new idle timer - show popup after 10 seconds of inactivity
-    // Only start timer if thank you screen is not showing
-    if (!this.showThankYouScreen) {
-      this.idleTimer = setTimeout(() => {
-        this.idleTime.isIdle = true;
-        this.showIdlePopup = true;
-        document.body.style.overflow = 'hidden';
-        console.log('💬 Showing idle popup - asking if user is still there');
-      }, this.idleTime.idleThreshold);
+    console.log('📡 Sending idle analytics to Zapier:', fullUrl);
+    console.log('📊 Full data being sent:', {
+      trigger: 'idle_timeout_50_seconds',
+      sessionId: this.sessionId,
+      name: this.urlParams.name || '',
+      email: this.urlParams.email || '',
+      totalSessionTime: Math.floor((Date.now() - this.sessionStartTime) / 1000),
+      events: events
+    });
+
+    try {
+      // --- ✅ Use sendBeacon when possible (works when page is closing/backgrounded) ---
+      if (navigator.sendBeacon) {
+        const beaconQueued = navigator.sendBeacon(fullUrl);
+
+        if (beaconQueued) {
+          console.log('✅ Analytics queued via sendBeacon (will be sent in background)');
+          // Also try fetch as backup to increase chances of delivery
+          this.sendBackupRequest(fullUrl);
+          return;
+        } else {
+          console.warn('⚠️ sendBeacon failed to queue request');
+        }
+      }
+
+      // --- ✅ Fallback to fetch if beacon not supported or failed ---
+      console.log('ℹ️ Using fetch request');
+      this.sendBackupRequest(fullUrl);
+
+    } catch (error) {
+      console.error('❌ Error sending analytics:', error);
     }
   }
 
-  private setupPageUnloadTracking() {
-    window.addEventListener('beforeunload', () => {
-      console.log('🚪 Page unloading - sending tracking data');
-      this.sendTrackingData('page_unload');
+  private sendBackupRequest(fullUrl: string) {
+    fetch(fullUrl, {
+      method: 'GET',
+      keepalive: true
+    })
+    .then(response => {
+      if (response.ok) {
+        console.log('✅ Analytics sent via fetch backup');
+      } else {
+        console.error('❌ Fetch backup failed:', response.status);
+      }
+    })
+    .catch(error => {
+      console.error('❌ Fetch backup error:', error);
     });
   }
+
+  private formatIdleAnalyticsDescription(events: any): string {
+    let description = `Idle Analytics - User Left Page and Stayed Away for 60 Seconds\n\n`;
+    
+    // Basic information
+    description += `Trigger: User Left and Stayed Away (60 seconds)\n`;
+    description += `Session ID: ${this.sessionId}\n`;
+    description += `User: ${this.urlParams.name || 'Unknown'}\n`;
+    description += `Email: ${this.urlParams.email || 'Unknown'}\n`;
+    description += `Total Session Time: ${this.formatTime(Math.floor((Date.now() - this.sessionStartTime) / 1000))}\n\n`;
+    
+    // Campaign tracking
+    if (this.urlParams.campaignName || this.urlParams.adsetName || this.urlParams.adName) {
+      description += `Campaign Tracking:\n`;
+      if (this.urlParams.campaignName) {
+        description += `Campaign: ${this.urlParams.campaignName}\n`;
+      }
+      if (this.urlParams.adsetName) {
+        description += `Adset: ${this.urlParams.adsetName}\n`;
+      }
+      if (this.urlParams.adName) {
+        description += `Ad: ${this.urlParams.adName}\n`;
+      }
+      description += `\n`;
+    }
+    
+    // Analytics data
+    description += `Analytics Events:\n`;
+    Object.keys(events).forEach(key => {
+      const readableKey = this.getReadableEventName(key);
+      const value = events[key];
+      const formattedValue = this.isTimeField(key) ? this.formatTime(value) : value;
+      description += `• ${readableKey}: ${formattedValue}\n`;
+    });
+    
+    description += `\nUser left page on: ${new Date().toLocaleString()}`;
+    
+    return description;
+  }
+
+
+  private getReadableEventName(technicalName: string): string {
+    const readableNames: { [key: string]: string } = {
+      'session_duration_on_price_section': 'Time spent on Price Section',
+      'session_duration_on_levels_section': 'Time spent on Levels Section',
+      'session_duration_on_teachers_section': 'Time spent on Teachers Section',
+      'session_duration_on_platform_section': 'Time spent on Platform Section',
+      'session_duration_on_advisors_section': 'Time spent on Advisors Section',
+      'session_duration_on_testimonials_section': 'Time spent on Testimonials Section',
+      'session_duration_on_form_section': 'Time spent on Form Section',
+      'session_idle_time_duration': 'Total Idle Time',
+      'form_started': 'Form Started',
+      'form_submitted': 'Form Submitted',
+      'form_interaction_time': 'Form Interaction Time'
+    };
+    return readableNames[technicalName] || technicalName;
+  }
+
+  private isTimeField(key: string): boolean {
+    return key.includes('duration') || key.includes('time') || key.includes('Time');
+  }
+
 
   private setupScrollDetection() {
     window.addEventListener('scroll', () => {
@@ -619,67 +828,78 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       return;
     }
     
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds)
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime
+    };
+
+    // Prepare form data in the successful format with analytics
+    const formData: FormData = {
+      selectedResponse: this.getChoiceEnglish(this.selectedChoice),
+      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+      otherReason: this.otherCancellationReason || undefined, // Include custom reason text
+      marketingConsent: this.selectedSubscription,
+      englishImpact: 'Not Applicable', // This form doesn't have English impact question
+      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
+      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
+      pricingResponse: this.selectedPlan || 'Not Selected',
+      name: this.urlParams.name,
+      email: this.urlParams.email,
+      campaignName: this.urlParams.campaignName,
+      adsetName: this.urlParams.adsetName,
+      adName: this.urlParams.adName,
+      fbClickId: this.urlParams.fbClickId,
+      // Analytics data
+      sessionId: this.sessionId,
+      trigger: 'form_submission',
+      timestamp: new Date().toISOString(),
+      totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      formInteractionTime: formInteractionTime
+    };
+
     try {
-      // Calculate form interaction time
-      let formInteractionTime = 0;
-      if (this.formStarted && this.formStartTime > 0) {
-        formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
-      }
-
-      // Prepare events data (convert to seconds)
-      const events = {
-        session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
-        session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
-        session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
-        session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
-        session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
-        session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
-        session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
-        session_idle_time_duration: Math.round(this.idleTime.total / 1000),
-        form_started: this.formStarted,
-        form_submitted: this.formSubmitted,
-        form_interaction_time: formInteractionTime
-      };
-
-      // Prepare form data in the successful format with analytics
-      const formData: FormData = {
-        selectedResponse: this.getChoiceEnglish(this.selectedChoice),
-        cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
-        otherReason: this.otherCancellationReason || undefined, // Include custom reason text
-        marketingConsent: this.selectedSubscription,
-        englishImpact: 'Not Applicable', // This form doesn't have English impact question
-        preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
-        paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
-        pricingResponse: this.selectedPlan || 'Not Selected',
-        name: this.urlParams.name,
-        email: this.urlParams.email,
-        campaignName: this.urlParams.campaignName,
-        adsetName: this.urlParams.adsetName,
-        adName: this.urlParams.adName,
-        fbClickId: this.urlParams.fbClickId,
-        // Analytics data
-        sessionId: this.sessionId,
-        trigger: 'form_submission',
-        timestamp: new Date().toISOString(),
-        totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
-        events: events,
-        userAgent: navigator.userAgent,
-        pageUrl: window.location.href,
-        formStarted: this.formStarted,
-        formSubmitted: this.formSubmitted,
-        formInteractionTime: formInteractionTime
-      };
-
       console.log('📤 Sending form data with analytics to Zapier:', formData);
       
       // Send using the new service
+      console.log('🚀 Attempting to send form data to Zapier...');
       const response = await this.zapierService.sendToZapier(formData);
       console.log('✅ Successfully sent to Zapier:', response);
       
-    } catch (error) {
-      console.error('❌ Error sending to Zapier:', error);
-      console.log('⚠️ Continuing without Zapier integration...');
-      // Don't throw error, just log it so the app continues to work
+    } catch (error: any) {
+      console.error('❌ Zapier Service Error:', {
+        error: error,
+        message: error?.message || 'Unknown error',
+        status: error?.status || 'Unknown status'
+      });
+      
+      // Try fallback method
+      console.log('🔄 Trying fallback method...');
+      try {
+        this.sendToZapier(formData);
+      } catch (fallbackError: any) {
+        console.error('❌ Fallback method also failed:', fallbackError);
+      }
     }
   }
 
@@ -1771,8 +1991,15 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   closeIdlePopup() {
     this.showIdlePopup = false;
     document.body.style.overflow = 'auto';
+    
+    // Clear the popup timer since user interacted
+    if (this.idlePopupTimer) {
+      clearTimeout(this.idlePopupTimer);
+      this.idlePopupTimer = null;
+    }
+    
     // Reset the idle timer to start fresh
-    this.resetIdleTimer();
+    this.startSimpleIdleTracking();
     console.log('💬 Idle popup closed - user is active again');
   }
 
@@ -1780,7 +2007,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.closeIdlePopup();
     
     // Reset idle timer when user chooses to stay
-    this.resetIdleTimer();
+    this.startSimpleIdleTracking();
     
     console.log('💬 User chose to stay on page - idle timer reset');
   }
@@ -1804,6 +2031,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     console.log('💬 User chose to leave page - showing thank you screen');
     console.log('🔍 showThankYouScreen value:', this.showThankYouScreen);
   }
+
+
+
 
   private sendSessionDataToZapier() {
     // Determine user interaction level
