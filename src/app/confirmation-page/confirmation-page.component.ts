@@ -705,6 +705,18 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         this.sendIdleAnalytics();
       }
     });
+
+    // ✅ Add pagehide event for even more reliable detection
+    window.addEventListener('pagehide', () => {
+      console.log('🚪 Page hide event - checking if 50 seconds passed');
+      const now = Date.now();
+      const timeSincePageLoad = now - pageLoadTime;
+      
+      if (timeSincePageLoad >= 50000) {
+        console.log('🚨 Page hide after 50 seconds - sending analytics immediately');
+        this.sendIdleAnalytics();
+      }
+    });
   }
 
   private checkTimestampAndSendIfNeeded() {
@@ -738,12 +750,54 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private sendIdleAnalytics() {
-    // Send analytics directly to Zapier using the same approach as the service
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds) - same as your existing pattern
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime
+    };
+
+    // Check if in development mode
+    if (this.isDevelopment) {
+      console.log('🔧 Development mode: Logging idle analytics (no Zapier API call)');
+      console.log('📊 Idle analytics data that would be sent:');
+      console.log({
+        trigger: 'idle_timeout_50_seconds',
+        sessionId: this.sessionId,
+        timestamp: new Date().toISOString(),
+        name: this.urlParams.name || '',
+        email: this.urlParams.email || '',
+        campaignName: this.urlParams.campaignName || '',
+        adsetName: this.urlParams.adsetName || '',
+        adName: this.urlParams.adName || '',
+        fbClickId: this.urlParams.fbClickId || '',
+        userAgent: navigator.userAgent,
+        pageUrl: window.location.href,
+        totalSessionTime: Math.floor((Date.now() - this.sessionStartTime) / 1000),
+        events: events
+      });
+      return;
+    }
+
     const webhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1m4k02/';
     
-    // Prepare the data
+    // Prepare URL parameters (matching your existing pattern)
     const params = new URLSearchParams();
-    params.set('trigger', 'idle_timeout_180_seconds');
+    params.set('trigger', 'idle_timeout_50_seconds');
     params.set('sessionId', this.sessionId);
     params.set('timestamp', new Date().toISOString());
     params.set('name', this.urlParams.name || '');
@@ -754,50 +808,121 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     params.set('fbClickId', this.urlParams.fbClickId || '');
     params.set('userAgent', navigator.userAgent);
     params.set('pageUrl', window.location.href);
+    params.set('totalSessionTime', Math.floor((Date.now() - this.sessionStartTime) / 1000).toString());
+    
+    // Add events data as JSON string (matching your existing pattern)
+    params.set('events', JSON.stringify(events));
+    
+    // Add formatted description (matching your existing pattern)
+    const description = this.formatIdleAnalyticsDescription(events);
+    params.set('description', description);
+    params.set('notes', description); // Alternative field name
+    params.set('comments', description); // Alternative field name
     
     const fullUrl = `${webhookUrl}?${params.toString()}`;
     
     console.log('📡 Sending idle analytics to Zapier:', fullUrl);
-    
-    // AGGRESSIVE: Try sendBeacon first for reliable transmission when user leaves
-    if (document.hidden) {
-      console.log('📡 User is away - using sendBeacon for reliable transmission');
-      const success = navigator.sendBeacon(fullUrl);
-      
-      if (success) {
-        console.log('✅ Idle analytics sent successfully via sendBeacon');
-      } else {
-        console.warn('⚠️ sendBeacon failed, trying fetch fallback');
-        // Fallback to fetch
-        fetch(fullUrl, { method: 'GET', keepalive: true })
-          .then(response => {
-            if (response.ok) {
-              console.log('✅ Fallback method succeeded');
-            } else {
-              console.error('❌ Fallback method failed:', response.status);
-            }
-          })
-          .catch(error => {
-            console.error('❌ Fallback method error:', error);
-          });
-      }
-    } else {
-      // User is still on page, use normal fetch
-      fetch(fullUrl, { 
-        method: 'GET', 
-        keepalive: true 
-      })
-      .then(response => {
-        if (response.ok) {
-          console.log('✅ Idle analytics sent successfully');
+
+    try {
+      // --- ✅ Use sendBeacon when possible (works when page is closing/backgrounded) ---
+      if (navigator.sendBeacon) {
+        const beaconQueued = navigator.sendBeacon(fullUrl);
+
+        if (beaconQueued) {
+          console.log('✅ Analytics queued via sendBeacon (will be sent in background)');
+          // Also try fetch as backup to increase chances of delivery
+          this.sendBackupRequest(fullUrl);
+          return;
         } else {
-          console.error('❌ Idle analytics failed:', response.status);
+          console.warn('⚠️ sendBeacon failed to queue request');
         }
-      })
-      .catch(error => {
-        console.error('❌ Idle analytics error:', error);
-      });
+      }
+
+      // --- ✅ Fallback to fetch if beacon not supported or failed ---
+      console.log('ℹ️ Using fetch request');
+      this.sendBackupRequest(fullUrl);
+
+    } catch (error) {
+      console.error('❌ Error sending analytics:', error);
     }
+  }
+
+  private sendBackupRequest(fullUrl: string) {
+    fetch(fullUrl, {
+      method: 'GET',
+      keepalive: true
+    })
+    .then(response => {
+      if (response.ok) {
+        console.log('✅ Analytics sent via fetch backup');
+      } else {
+        console.error('❌ Fetch backup failed:', response.status);
+      }
+    })
+    .catch(error => {
+      console.error('❌ Fetch backup error:', error);
+    });
+  }
+
+  private formatIdleAnalyticsDescription(events: any): string {
+    let description = `Idle Analytics - User Left Page After 50 Seconds\n\n`;
+    
+    // Basic information
+    description += `Trigger: Idle Timeout (50 seconds)\n`;
+    description += `Session ID: ${this.sessionId}\n`;
+    description += `User: ${this.urlParams.name || 'Unknown'}\n`;
+    description += `Email: ${this.urlParams.email || 'Unknown'}\n`;
+    description += `Total Session Time: ${this.formatTime(Math.floor((Date.now() - this.sessionStartTime) / 1000))}\n\n`;
+    
+    // Campaign tracking
+    if (this.urlParams.campaignName || this.urlParams.adsetName || this.urlParams.adName) {
+      description += `Campaign Tracking:\n`;
+      if (this.urlParams.campaignName) {
+        description += `Campaign: ${this.urlParams.campaignName}\n`;
+      }
+      if (this.urlParams.adsetName) {
+        description += `Adset: ${this.urlParams.adsetName}\n`;
+      }
+      if (this.urlParams.adName) {
+        description += `Ad: ${this.urlParams.adName}\n`;
+      }
+      description += `\n`;
+    }
+    
+    // Analytics data
+    description += `Analytics Events:\n`;
+    Object.keys(events).forEach(key => {
+      const readableKey = this.getReadableEventName(key);
+      const value = events[key];
+      const formattedValue = this.isTimeField(key) ? this.formatTime(value) : value;
+      description += `• ${readableKey}: ${formattedValue}\n`;
+    });
+    
+    description += `\nUser left page on: ${new Date().toLocaleString()}`;
+    
+    return description;
+  }
+
+
+  private getReadableEventName(technicalName: string): string {
+    const readableNames: { [key: string]: string } = {
+      'session_duration_on_price_section': 'Time spent on Price Section',
+      'session_duration_on_levels_section': 'Time spent on Levels Section',
+      'session_duration_on_teachers_section': 'Time spent on Teachers Section',
+      'session_duration_on_platform_section': 'Time spent on Platform Section',
+      'session_duration_on_advisors_section': 'Time spent on Advisors Section',
+      'session_duration_on_testimonials_section': 'Time spent on Testimonials Section',
+      'session_duration_on_form_section': 'Time spent on Form Section',
+      'session_idle_time_duration': 'Total Idle Time',
+      'form_started': 'Form Started',
+      'form_submitted': 'Form Submitted',
+      'form_interaction_time': 'Form Interaction Time'
+    };
+    return readableNames[technicalName] || technicalName;
+  }
+
+  private isTimeField(key: string): boolean {
+    return key.includes('duration') || key.includes('time') || key.includes('Time');
   }
 
 
