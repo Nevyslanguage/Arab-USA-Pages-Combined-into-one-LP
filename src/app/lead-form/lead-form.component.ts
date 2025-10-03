@@ -15,7 +15,7 @@ import { getMaxDigitsForCountry } from '.././country-digit-limits';
 })
 export class LeadFormComponent implements OnInit {
   // Development flag to disable Zapier calls during development
-  private readonly isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  private readonly isDevelopment = false; // Disabled to allow localhost testing
   
   title = 'arableadform';
   leadForm: FormGroup;

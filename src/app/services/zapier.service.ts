@@ -28,6 +28,7 @@ export interface FormData {
   formStarted?: boolean;
   formSubmitted?: boolean;
   formInteractionTime?: number;
+  description?: string;
 }
 
 @Injectable({
@@ -111,7 +112,7 @@ export class ZapierService {
       if (formData.pageUrl) params.set('page_url', formData.pageUrl);
       
       // Formatted description for Salesforce
-      const description = this.formatFormDataForDescription(formData);
+      const description = formData.description || this.formatFormDataForDescription(formData);
       params.set('description', description);
       params.set('notes', description); // Alternative field name
       params.set('comments', description); // Alternative field name
