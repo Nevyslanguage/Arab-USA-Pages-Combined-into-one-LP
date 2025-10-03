@@ -265,7 +265,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
     
     // Send tracking data before component is destroyed (page closing)
-    this.sendTrackingData('page_closing');
+    this.sendFormDataToZapier();
   }
 
   // ===== TRACKING SYSTEM METHODS =====
@@ -967,8 +967,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       // --- ✅ Use the EXACT same method as confirm/cancel actions ---
       console.log('ℹ️ Using sendTrackingData method (same as confirm/cancel)');
       
-      // Use the same sendTrackingData method that works for confirm/cancel
-      this.sendTrackingData('user_away_for_60_plus_seconds');
+      // Use the same sendFormDataToZapier method for consistency
+      this.sendFormDataToZapier();
 
     } catch (error) {
       console.error('❌ Error sending away analytics:', error);
@@ -2051,9 +2051,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Send form data using the new successful Zapier service
     this.sendFormDataToZapier();
 
-    // Send analytics data for final action (keep existing tracking)
-    this.sendLeadUpdateToZapier();
-
     // Handle cancellation - show thanks message instead of WhatsApp
     if (this.userSelections.choice === 'cancel') {
       this.closeVerificationPage();
@@ -2097,7 +2094,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Wrap in try-catch to prevent errors from breaking the UI
     try {
       this.sendFormDataToZapier();
-      this.sendLeadUpdateToZapier();
     } catch (error) {
       console.error('⚠️ Zapier integration failed, continuing with UI:', error);
     }
@@ -2362,7 +2358,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Send session data to Zapier if not already sent
     if (!this.sessionDataSent) {
-      this.sendSessionDataToZapier();
+      this.sendFormDataToZapier();
       this.sessionDataSent = true;
     }
     
