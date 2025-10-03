@@ -1095,14 +1095,23 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       trigger: trigger,
       timestamp: new Date().toISOString(),
       total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
-      events: events,
       user_agent: navigator.userAgent,
       page_url: window.location.href,
       
       // Form interaction data
       form_started: this.formStarted,
       form_submitted: this.formSubmitted,
-      form_interaction_time: this.formStarted && this.formStartTime > 0 ? Math.round((Date.now() - this.formStartTime) / 1000) : 0
+      form_interaction_time: this.formStarted && this.formStartTime > 0 ? Math.round((Date.now() - this.formStartTime) / 1000) : 0,
+      
+      // Session duration data as separate parameters (formatted as MM:SS)
+      session_duration_on_price_section: this.formatTime(events.session_duration_on_price_section),
+      session_duration_on_levels_section: this.formatTime(events.session_duration_on_levels_section),
+      session_duration_on_teachers_section: this.formatTime(events.session_duration_on_teachers_section),
+      session_duration_on_platform_section: this.formatTime(events.session_duration_on_platform_section),
+      session_duration_on_advisors_section: this.formatTime(events.session_duration_on_advisors_section),
+      session_duration_on_testimonials_section: this.formatTime(events.session_duration_on_testimonials_section),
+      session_duration_on_form_section: this.formatTime(events.session_duration_on_form_section),
+      session_idle_time_duration: this.formatTime(events.session_idle_time_duration)
     };
 
     // Add formatted description after the object is created
@@ -1187,12 +1196,20 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         trigger: 'form_submission',
         timestamp: new Date().toISOString(),
         totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
-        events: events,
         userAgent: navigator.userAgent,
         pageUrl: window.location.href,
         formStarted: this.formStarted,
         formSubmitted: this.formSubmitted,
-        formInteractionTime: formInteractionTime
+        formInteractionTime: formInteractionTime,
+        // Session duration data as separate parameters (formatted as MM:SS)
+        session_duration_on_price_section: this.formatTime(events.session_duration_on_price_section),
+        session_duration_on_levels_section: this.formatTime(events.session_duration_on_levels_section),
+        session_duration_on_teachers_section: this.formatTime(events.session_duration_on_teachers_section),
+        session_duration_on_platform_section: this.formatTime(events.session_duration_on_platform_section),
+        session_duration_on_advisors_section: this.formatTime(events.session_duration_on_advisors_section),
+        session_duration_on_testimonials_section: this.formatTime(events.session_duration_on_testimonials_section),
+        session_duration_on_form_section: this.formatTime(events.session_duration_on_form_section),
+        session_idle_time_duration: this.formatTime(events.session_idle_time_duration)
       };
 
     try {
@@ -1324,12 +1341,21 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       trigger: 'form_submission_start',
       timestamp: new Date().toISOString(),
       total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
-      events: events,
       user_agent: navigator.userAgent,
       page_url: window.location.href,
       form_started: this.formStarted,
       form_submitted: this.formSubmitted,
-      form_interaction_time: formInteractionTime
+      form_interaction_time: formInteractionTime,
+      
+      // Session duration data as separate parameters (formatted as MM:SS)
+      session_duration_on_price_section: this.formatTime(events.session_duration_on_price_section),
+      session_duration_on_levels_section: this.formatTime(events.session_duration_on_levels_section),
+      session_duration_on_teachers_section: this.formatTime(events.session_duration_on_teachers_section),
+      session_duration_on_platform_section: this.formatTime(events.session_duration_on_platform_section),
+      session_duration_on_advisors_section: this.formatTime(events.session_duration_on_advisors_section),
+      session_duration_on_testimonials_section: this.formatTime(events.session_duration_on_testimonials_section),
+      session_duration_on_form_section: this.formatTime(events.session_duration_on_form_section),
+      session_idle_time_duration: this.formatTime(events.session_idle_time_duration)
     };
 
     console.log('📋 LEAD UPDATE DATA:', leadUpdateData);
@@ -2395,7 +2421,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       timestamp: new Date().toISOString(),
       total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
       interaction_level: interactionLevel,
-      events: events,
       user_agent: navigator.userAgent,
       page_url: window.location.href,
       
@@ -2409,7 +2434,17 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       cancellation_reasons: this.selectedCancellationReasons,
       subscription_preference: this.selectedSubscription,
       preferred_start_time: this.selectedStartTime,
-      payment_method_available: this.selectedPayment
+      payment_method_available: this.selectedPayment,
+      
+      // Session duration data as separate parameters (formatted as MM:SS)
+      session_duration_on_price_section: this.formatTime(events.session_duration_on_price_section),
+      session_duration_on_levels_section: this.formatTime(events.session_duration_on_levels_section),
+      session_duration_on_teachers_section: this.formatTime(events.session_duration_on_teachers_section),
+      session_duration_on_platform_section: this.formatTime(events.session_duration_on_platform_section),
+      session_duration_on_advisors_section: this.formatTime(events.session_duration_on_advisors_section),
+      session_duration_on_testimonials_section: this.formatTime(events.session_duration_on_testimonials_section),
+      session_duration_on_form_section: this.formatTime(events.session_duration_on_form_section),
+      session_idle_time_duration: this.formatTime(events.session_idle_time_duration)
     };
 
     console.log('📊 Sending session data to Zapier:', sessionData);
