@@ -264,8 +264,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       clearTimeout(this.pricingTimer);
     }
     
-    // Send tracking data before component is destroyed (page closing)
-    this.sendTrackingData('page_closing');
+    // Send data for session (only once per session)
+    this.sendDataForSession('user_closed_page');
   }
 
   // ===== TRACKING SYSTEM METHODS =====
@@ -967,8 +967,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       // --- ✅ Use the EXACT same method as confirm/cancel actions ---
       console.log('ℹ️ Using sendTrackingData method (same as confirm/cancel)');
       
-      // Use the same sendTrackingData method that works for confirm/cancel
-      this.sendTrackingData('user_away_for_60_plus_seconds');
+      // Send data for session (only once per session)
+      this.sendDataForSession('user_away_90_seconds');
 
     } catch (error) {
       console.error('❌ Error sending away analytics:', error);
@@ -1273,6 +1273,143 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     .catch(error => {
       console.error('❌ Error sending to Zapier:', error);
     });
+  }
+
+  // Centralized method to send data for session (only once per session)
+  private sendDataForSession(scenario: string) {
+    // Check if data has already been sent for this session
+    if (this.sessionDataSent) {
+      console.log(`⚠️ Data already sent for this session - skipping duplicate`);
+      return;
+    }
+    
+    // Mark this session as data sent
+    this.sessionDataSent = true;
+    console.log(`📤 Sending data for session (scenario: ${scenario})`);
+    
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds)
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime
+    };
+
+    // Prepare data for Make.com
+    const scenarioData = {
+      // Lead identification
+      lead_email: this.urlParams.email,
+      lead_name: this.urlParams.name,
+      
+      // Campaign data
+      campaign_name: this.urlParams.campaignName,
+      adset_name: this.urlParams.adsetName,
+      ad_name: this.urlParams.adName,
+      fb_click_id: this.urlParams.fbClickId,
+      
+      // Scenario information
+      scenario: scenario,
+      trigger: scenario,
+      session_id: this.sessionId,
+      timestamp: new Date().toISOString(),
+      total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
+      user_agent: navigator.userAgent,
+      page_url: window.location.href,
+      
+      // Form interaction data
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime,
+      
+      // User choice data (if available)
+      selected_choice: this.selectedChoice,
+      cancellation_reasons: this.selectedCancellationReasons,
+      subscription_preference: this.selectedSubscription,
+      preferred_start_time: this.selectedStartTime,
+      payment_method_available: this.selectedPayment,
+      other_reason: this.otherCancellationReason
+    };
+
+    console.log(`📊 SCENARIO DATA (${scenario}):`, scenarioData);
+    
+    // Send to Make.com webhook
+    this.sendToZapier(scenarioData);
+  }
+
+  private sendAnalyticsToMake() {
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds)
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime
+    };
+
+    // Prepare analytics data for Make.com (Second call)
+    const analyticsData = {
+      // Lead identification
+      lead_email: this.urlParams.email,
+      lead_name: this.urlParams.name,
+      
+      // Campaign data
+      campaign_name: this.urlParams.campaignName,
+      adset_name: this.urlParams.adsetName,
+      ad_name: this.urlParams.adName,
+      fb_click_id: this.urlParams.fbClickId,
+      
+      // Analytics trigger
+      trigger: 'whatsapp_button_clicked',
+      session_id: this.sessionId,
+      timestamp: new Date().toISOString(),
+      total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
+      user_agent: navigator.userAgent,
+      page_url: window.location.href,
+      
+      // Form interaction data
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime,
+      
+      // User choice data
+      selected_choice: this.selectedChoice,
+      cancellation_reasons: this.selectedCancellationReasons,
+      subscription_preference: this.selectedSubscription,
+      preferred_start_time: this.selectedStartTime,
+      payment_method_available: this.selectedPayment
+    };
+
+    console.log('📊 ANALYTICS DATA (Second Make.com call):', analyticsData);
+    
+    // Send to Make.com webhook (Second call)
+    this.sendToZapier(analyticsData);
   }
 
   private sendLeadUpdateToZapier() {
@@ -2004,7 +2141,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.userSelections.name = name;
   }
 
-  proceedToWhatsApp() {
+  async proceedToWhatsApp() {
     // Mark form as submitted when user completes the form
     this.formSubmitted = true;
     console.log('✅ Form submitted - User completed the form via proceedToWhatsApp');
@@ -2022,11 +2159,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.log('🔧 Name fallback applied:', this.userSelections.name);
     }
 
-    // Send form data using the new successful Zapier service
-    this.sendFormDataToZapier();
-
-    // Send analytics data for final action (keep existing tracking)
-    this.sendLeadUpdateToZapier();
+    // Send data for session (only once per session)
+    this.sendDataForSession('user_confirmed_whatsapp');
 
     // Handle cancellation - show thanks message instead of WhatsApp
     if (this.userSelections.choice === 'cancel') {
@@ -2038,6 +2172,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
     // Handle confirmation - always go to WhatsApp
     if (this.userSelections.choice === 'confirm') {
+      console.log('📤 Webhook calls completed, proceeding to WhatsApp...');
       // Always go to WhatsApp for confirmations (regardless of payment method)
       this.goToWhatsApp();
       this.resetFormValues(); // Reset form after submission
@@ -2067,14 +2202,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   private showThanksMessage(isCancellation: boolean = false) {
     console.log('🔍 showThanksMessage - isCancellation:', isCancellation, 'selectedChoice:', this.selectedChoice);
     
-    // Try to send form data using the new successful Zapier service
-    // Wrap in try-catch to prevent errors from breaking the UI
-    try {
-      this.sendFormDataToZapier();
-      this.sendLeadUpdateToZapier();
-    } catch (error) {
-      console.error('⚠️ Zapier integration failed, continuing with UI:', error);
-    }
+    // Send data for session (only once per session)
+    this.sendDataForSession('user_cancelled');
     
     // Check if this is a cancellation to show success page
     if (isCancellation || this.selectedChoice === 'cancel') {
@@ -2334,11 +2463,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Close idle popup
     this.closeIdlePopup();
     
-    // Send session data to Zapier if not already sent
-    if (!this.sessionDataSent) {
-      this.sendSessionDataToZapier();
-      this.sessionDataSent = true;
-    }
+    // Send data for session (only once per session)
+    this.sendDataForSession('user_idle_leave');
     
     console.log('💬 User chose to leave page - showing thank you screen');
     console.log('🔍 showThankYouScreen value:', this.showThankYouScreen);
