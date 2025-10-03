@@ -652,19 +652,99 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private setupBackgroundTracking() {
-    // SIMPLE APPROACH: Just check when user returns
+    // Store the page load time for timestamp-based tracking
+    const pageLoadTime = Date.now();
+    localStorage.setItem('nevys_page_load_time', pageLoadTime.toString());
+    localStorage.setItem('nevys_session_id', this.sessionId);
+    
+    console.log('💾 Stored page load time:', new Date(pageLoadTime).toISOString());
+
+    // Check when user returns to tab
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        // User returned - check if 180 seconds have passed
-        console.log('👋 User returned to tab - checking if 180 seconds passed');
-        this.checkIf180SecondsPassed();
+        console.log('👋 User returned to tab - checking timestamp');
+        this.checkTimestampAndSendIfNeeded();
       }
     });
 
     // Also check on page focus
     window.addEventListener('focus', () => {
-      console.log('👋 Page focused - checking if 180 seconds passed');
-      this.checkIf180SecondsPassed();
+      console.log('👋 Page focused - checking timestamp');
+      this.checkTimestampAndSendIfNeeded();
+    });
+
+    // AGGRESSIVE: Check every 10 seconds using timestamp
+    setInterval(() => {
+      this.checkTimestampAndSendIfNeeded();
+    }, 10000);
+  }
+
+  private checkTimestampAndSendIfNeeded() {
+    try {
+      const stored = localStorage.getItem('nevys_page_load_time');
+      const sessionId = localStorage.getItem('nevys_session_id');
+      
+      if (!stored || sessionId !== this.sessionId) return;
+      
+      const pageLoadTime = parseInt(stored);
+      const now = Date.now();
+      const timeSincePageLoad = now - pageLoadTime;
+      
+      console.log('🕐 Timestamp check:', {
+        pageLoadTime: new Date(pageLoadTime).toISOString(),
+        now: new Date(now).toISOString(),
+        timeSincePageLoad: timeSincePageLoad,
+        threshold: 180000,
+        shouldSend: timeSincePageLoad >= 180000
+      });
+      
+      if (timeSincePageLoad >= 180000) {
+        console.log('⏰ Timestamp: 180 seconds since page load - sending analytics');
+        this.sendIdleAnalytics();
+        localStorage.removeItem('nevys_page_load_time');
+        localStorage.removeItem('nevys_session_id');
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not check timestamp:', e);
+    }
+  }
+
+  private sendIdleAnalytics() {
+    // Send analytics directly to Zapier using the same approach as the service
+    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1m4k02/';
+    
+    // Prepare the data
+    const params = new URLSearchParams();
+    params.set('trigger', 'idle_timeout_180_seconds');
+    params.set('sessionId', this.sessionId);
+    params.set('timestamp', new Date().toISOString());
+    params.set('name', this.urlParams.name || '');
+    params.set('email', this.urlParams.email || '');
+    params.set('campaignName', this.urlParams.campaignName || '');
+    params.set('adsetName', this.urlParams.adsetName || '');
+    params.set('adName', this.urlParams.adName || '');
+    params.set('fbClickId', this.urlParams.fbClickId || '');
+    params.set('userAgent', navigator.userAgent);
+    params.set('pageUrl', window.location.href);
+    
+    const fullUrl = `${webhookUrl}?${params.toString()}`;
+    
+    console.log('📡 Sending idle analytics to Zapier:', fullUrl);
+    
+    // Use fetch with keepalive for reliable transmission
+    fetch(fullUrl, { 
+      method: 'GET', 
+      keepalive: true 
+    })
+    .then(response => {
+      if (response.ok) {
+        console.log('✅ Idle analytics sent successfully');
+      } else {
+        console.error('❌ Idle analytics failed:', response.status);
+      }
+    })
+    .catch(error => {
+      console.error('❌ Idle analytics error:', error);
     });
   }
 
