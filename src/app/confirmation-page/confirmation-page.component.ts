@@ -560,6 +560,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   private setupPageVisibilityTracking() {
     let hiddenStartTime: number | null = null;
     let awayTimer: any = null;
+    let mobileInterval: any = null;
     
     // Mobile-friendly approach: Use multiple fallback methods
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -577,20 +578,20 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         console.log('📱 Mobile device:', isMobile);
         
         if (isMobile) {
-          // Mobile: Use same setTimeout approach as desktop, but with localStorage backup
-          console.log('📱 Using mobile-friendly tracking (same as desktop)');
+          // Mobile: Use multiple fallback methods for reliability
+          console.log('📱 Using mobile-friendly tracking with fallbacks');
           
           // Store in localStorage for persistence
           localStorage.setItem('awayStartTime', hiddenStartTime.toString());
           localStorage.setItem('awayTrackingActive', 'true');
           
-          // Use setTimeout just like desktop, but with mobile-friendly sendBeacon
+          // Method 1: setTimeout (primary)
           awayTimer = setTimeout(() => {
             if (document.hidden && hiddenStartTime) {
               const timeAway = Date.now() - hiddenStartTime;
               const timeAwaySeconds = Math.floor(timeAway / 1000);
               
-              console.log('🚨 Mobile: User has been away for 90+ seconds - Sending analytics NOW!');
+              console.log('🚨 Mobile setTimeout: User has been away for 90+ seconds - Sending analytics NOW!');
               console.log('⏱️ Time away:', timeAwaySeconds, 'seconds');
               this.sendAwayAnalytics(timeAwaySeconds);
               
@@ -598,7 +599,34 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
               localStorage.removeItem('awayStartTime');
               localStorage.removeItem('awayTrackingActive');
             }
-          }, 90000); // 90 seconds - same as desktop
+          }, 90000); // 90 seconds
+          
+          // Method 2: Interval fallback (every 10 seconds) for mobile reliability
+          mobileInterval = setInterval(() => {
+            console.log('📱 Mobile interval running - document.hidden:', document.hidden, 'hiddenStartTime:', hiddenStartTime);
+            
+            if (document.hidden && hiddenStartTime) {
+              const timeAway = Date.now() - hiddenStartTime;
+              const timeAwaySeconds = Math.floor(timeAway / 1000);
+              
+              console.log('📱 Mobile interval check - Time away:', timeAwaySeconds, 'seconds');
+              
+              if (timeAwaySeconds >= 90) {
+                console.log('🚨 Mobile interval: User has been away for 90+ seconds - Sending analytics NOW!');
+                this.sendAwayAnalytics(timeAwaySeconds);
+                
+                // Clear everything
+                clearTimeout(awayTimer);
+                clearInterval(mobileInterval);
+                localStorage.removeItem('awayStartTime');
+                localStorage.removeItem('awayTrackingActive');
+              }
+            } else if (!document.hidden) {
+              // User returned, clear interval
+              console.log('📱 Mobile: User returned, clearing interval');
+              clearInterval(mobileInterval);
+            }
+          }, 10000); // Check every 10 seconds
           
         } else {
           // Desktop: Use setTimeout (more reliable on desktop)
@@ -635,6 +663,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
             console.log('✅ User returned before 90 seconds - Analytics timer cancelled');
           }
           
+          if (mobileInterval) {
+            clearInterval(mobileInterval);
+            mobileInterval = null;
+            console.log('✅ Mobile: User returned before 90 seconds - Analytics interval cancelled');
+          }
+          
           // Clear mobile tracking data
           localStorage.removeItem('awayStartTime');
           localStorage.removeItem('awayTrackingActive');
@@ -661,30 +695,109 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       this.logPageVisibilityChange('focus');
     });
     
-    // Mobile-specific: Add pagehide and pageshow events for better mobile support
-    window.addEventListener('pagehide', (event) => {
-      console.log('📱 Mobile: Page hide event triggered');
-      if (isMobile && !hiddenStartTime) {
-        hiddenStartTime = Date.now();
-        localStorage.setItem('awayStartTime', hiddenStartTime.toString());
-        localStorage.setItem('awayTrackingActive', 'true');
-        console.log('📱 Mobile: Started tracking on pagehide');
-      }
-    });
-    
-    window.addEventListener('pageshow', (event) => {
-      console.log('📱 Mobile: Page show event triggered');
-      if (isMobile) {
-        // Just clear any pending tracking data - analytics should have been sent while away
-        const trackingActive = localStorage.getItem('awayTrackingActive');
-        
-        if (trackingActive === 'true') {
-          console.log('📱 Mobile: User returned - clearing tracking data (analytics should have been sent while away)');
+    // Mobile-specific events that work better on mobile browsers
+    if (isMobile) {
+      console.log('📱 Adding mobile-specific event listeners');
+      
+      // Mobile: pagehide/pageshow events (more reliable than visibilitychange on mobile)
+      window.addEventListener('pagehide', (event) => {
+        console.log('📱 Mobile: pagehide event - User leaving page');
+        if (!hiddenStartTime) {
+          hiddenStartTime = Date.now();
+          localStorage.setItem('awayStartTime', hiddenStartTime.toString());
+          localStorage.setItem('awayTrackingActive', 'true');
+          console.log('📱 Mobile: Started tracking on pagehide');
+        }
+      });
+      
+      window.addEventListener('pageshow', (event) => {
+        console.log('📱 Mobile: pageshow event - User returned to page');
+        if (hiddenStartTime) {
+          const timeAway = Date.now() - hiddenStartTime;
+          const timeAwaySeconds = Math.floor(timeAway / 1000);
+          
+          console.log('📱 Mobile: pageshow - Time away:', timeAwaySeconds, 'seconds');
+          
+          if (timeAwaySeconds >= 90) {
+            console.log('🚨 Mobile: pageshow - User was away for 90+ seconds - Sending analytics!');
+            this.sendAwayAnalytics(timeAwaySeconds);
+          }
+          
+          // Clear tracking data
+          localStorage.removeItem('awayStartTime');
+          localStorage.removeItem('awayTrackingActive');
+          hiddenStartTime = null;
+        }
+      });
+      
+      // Mobile: App state change events (iOS/Android specific)
+      document.addEventListener('pause', () => {
+        console.log('📱 Mobile: App paused - User switched to another app');
+        if (!hiddenStartTime) {
+          hiddenStartTime = Date.now();
+          localStorage.setItem('awayStartTime', hiddenStartTime.toString());
+          localStorage.setItem('awayTrackingActive', 'true');
+          console.log('📱 Mobile: Started tracking on app pause');
+        }
+      });
+      
+      document.addEventListener('resume', () => {
+        console.log('📱 Mobile: App resumed - User returned to this app');
+        if (hiddenStartTime) {
+          const timeAway = Date.now() - hiddenStartTime;
+          const timeAwaySeconds = Math.floor(timeAway / 1000);
+          
+          console.log('📱 Mobile: resume - Time away:', timeAwaySeconds, 'seconds');
+          
+          if (timeAwaySeconds >= 90) {
+            console.log('🚨 Mobile: resume - User was away for 90+ seconds - Sending analytics!');
+            this.sendAwayAnalytics(timeAwaySeconds);
+          }
+          
+          // Clear tracking data
+          localStorage.removeItem('awayStartTime');
+          localStorage.removeItem('awayTrackingActive');
+          hiddenStartTime = null;
+        }
+      });
+      
+      // Mobile: Orientation change (indicates user interaction)
+      window.addEventListener('orientationchange', () => {
+        console.log('📱 Mobile: Orientation changed - User is interacting');
+        // Reset any tracking if user is actively using the device
+        if (hiddenStartTime) {
+          console.log('📱 Mobile: User interaction detected - Cancelling away tracking');
+          hiddenStartTime = null;
           localStorage.removeItem('awayStartTime');
           localStorage.removeItem('awayTrackingActive');
         }
-      }
-    });
+      });
+    }
+    
+    // Mobile-specific: Add additional mobile event listeners
+    if (isMobile) {
+      // Mobile: Touch events to detect user interaction
+      document.addEventListener('touchstart', () => {
+        console.log('📱 Mobile: Touch detected - User is interacting');
+        if (hiddenStartTime) {
+          console.log('📱 Mobile: User interaction detected - Cancelling away tracking');
+          hiddenStartTime = null;
+          localStorage.removeItem('awayStartTime');
+          localStorage.removeItem('awayTrackingActive');
+        }
+      });
+      
+      // Mobile: Device motion (if user is moving the device)
+      window.addEventListener('devicemotion', () => {
+        console.log('📱 Mobile: Device motion detected - User is interacting');
+        if (hiddenStartTime) {
+          console.log('📱 Mobile: User interaction detected - Cancelling away tracking');
+          hiddenStartTime = null;
+          localStorage.removeItem('awayStartTime');
+          localStorage.removeItem('awayTrackingActive');
+        }
+      });
+    }
     
     // Mobile-specific: Add beforeunload for last-chance analytics
     window.addEventListener('beforeunload', () => {
@@ -692,9 +805,16 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         const timeAway = Date.now() - hiddenStartTime;
         const timeAwaySeconds = Math.floor(timeAway / 1000);
         
+        console.log('📱 Mobile: beforeunload - Time away:', timeAwaySeconds, 'seconds');
+        
         if (timeAwaySeconds >= 90) {
           console.log('📱 Mobile: beforeunload - Sending analytics as user leaves');
           this.sendAwayAnalytics(timeAwaySeconds);
+        } else {
+          console.log('📱 Mobile: beforeunload - Not enough time away, storing for later');
+          // Store that user left but didn't reach 90 seconds yet
+          localStorage.setItem('userLeftTime', hiddenStartTime.toString());
+          localStorage.setItem('waitingFor90Seconds', 'true');
         }
       }
     });
@@ -707,11 +827,33 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     if (isMobile) {
       console.log('📱 Mobile recovery check on page load');
       
-      // Just clear any stale tracking data - analytics should have been sent while away
-      const trackingActive = localStorage.getItem('awayTrackingActive');
+      // Check if user left but didn't reach 90 seconds yet
+      const userLeftTime = localStorage.getItem('userLeftTime');
+      const waitingFor90Seconds = localStorage.getItem('waitingFor90Seconds');
       
+      if (userLeftTime && waitingFor90Seconds === 'true') {
+        const timeAway = Date.now() - parseInt(userLeftTime);
+        const timeAwaySeconds = Math.floor(timeAway / 1000);
+        
+        console.log('📱 Mobile: Found user who left but didn\'t reach 90 seconds');
+        console.log('📱 Time away since leaving:', timeAwaySeconds, 'seconds');
+        
+        if (timeAwaySeconds >= 90) {
+          console.log('🚨 Mobile: User was away for 90+ seconds - Sending analytics on return!');
+          this.sendAwayAnalytics(timeAwaySeconds);
+        } else {
+          console.log('📱 Mobile: User returned before 90 seconds - No analytics sent');
+        }
+        
+        // Clear the data
+        localStorage.removeItem('userLeftTime');
+        localStorage.removeItem('waitingFor90Seconds');
+      }
+      
+      // Clear any stale tracking data
+      const trackingActive = localStorage.getItem('awayTrackingActive');
       if (trackingActive === 'true') {
-        console.log('📱 Mobile: Clearing stale tracking data (analytics should have been sent while away)');
+        console.log('📱 Mobile: Clearing stale tracking data');
         localStorage.removeItem('awayStartTime');
         localStorage.removeItem('awayTrackingActive');
       }
