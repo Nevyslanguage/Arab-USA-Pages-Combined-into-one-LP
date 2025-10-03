@@ -246,9 +246,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.setupBackgroundTracking();
     this.setupScrollDetection();
     
-    // Test Zapier connection on page load
-    this.testZapierConnection();
-    
     // Start the 180-second timer
     this.resetIdleTimer();
   }
@@ -2439,38 +2436,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async testZapierConnection() {
-    try {
-      console.log('🧪 Testing Zapier connection...');
-      
-      const testData = {
-        selectedResponse: 'Test Connection',
-        cancelReasons: ['Test'],
-        marketingConsent: 'Test',
-        englishImpact: 'Test',
-        preferredStartTime: 'Test',
-        paymentReadiness: 'Test',
-        pricingResponse: 'Test',
-        sessionId: 'test_' + Date.now(),
-        trigger: 'connection_test',
-        timestamp: new Date().toISOString(),
-        totalSessionTime: 0,
-        events: { test: true },
-        userAgent: navigator.userAgent,
-        pageUrl: window.location.href,
-        formStarted: false,
-        formSubmitted: false,
-        formInteractionTime: 0
-      };
-      
-      const response = await this.zapierService.sendToZapier(testData);
-      console.log('✅ Zapier connection test successful:', response);
-      
-    } catch (error) {
-      console.error('❌ Zapier connection test failed:', error);
-      console.log('🔧 Check your webhook URL and network connection');
-    }
-  }
 
 
   private sendSessionDataToZapier() {
