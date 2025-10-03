@@ -12,7 +12,7 @@ import { ZapierService, FormData } from '../services/zapier.service';
 })
 export class ConfirmationPageComponent implements OnInit, OnDestroy {
   // Development flag to disable Zapier calls during development
-  private readonly isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  private readonly isDevelopment = false; // Temporarily disabled for testing
   
   constructor(private zapierService: ZapierService) {}
   selectedChoice: string = '';
@@ -655,6 +655,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     localStorage.setItem('nevys_session_id', this.sessionId);
     
     console.log('💾 Stored page load time:', new Date(pageLoadTime).toISOString());
+    console.log('🔧 Development mode disabled - will send real data to Zapier');
 
     // AGGRESSIVE: Check every 3 seconds using timestamp
     setInterval(() => {
@@ -682,11 +683,19 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         const now = Date.now();
         const timeSincePageLoad = now - pageLoadTime;
         
+        console.log('🕐 Time check on visibility change:', {
+          timeSincePageLoad: timeSincePageLoad,
+          threshold: 50000,
+          shouldSend: timeSincePageLoad >= 50000
+        });
+        
         if (timeSincePageLoad >= 50000) {
           console.log('🚨 User left after 50 seconds - sending analytics immediately');
           this.sendIdleAnalytics();
           localStorage.removeItem('nevys_page_load_time');
           localStorage.removeItem('nevys_session_id');
+        } else {
+          console.log('⏳ Not enough time passed yet:', Math.round(timeSincePageLoad / 1000), 'seconds');
         }
       }
     });
@@ -747,6 +756,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private sendIdleAnalytics() {
+    console.log('🚀 sendIdleAnalytics called - preparing to send data');
+    
     // Calculate form interaction time
     let formInteractionTime = 0;
     if (this.formStarted && this.formStartTime > 0) {
@@ -819,6 +830,14 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     const fullUrl = `${webhookUrl}?${params.toString()}`;
     
     console.log('📡 Sending idle analytics to Zapier:', fullUrl);
+    console.log('📊 Full data being sent:', {
+      trigger: 'idle_timeout_50_seconds',
+      sessionId: this.sessionId,
+      name: this.urlParams.name || '',
+      email: this.urlParams.email || '',
+      totalSessionTime: Math.floor((Date.now() - this.sessionStartTime) / 1000),
+      events: events
+    });
 
     try {
       // --- ✅ Use sendBeacon when possible (works when page is closing/backgrounded) ---
