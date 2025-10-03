@@ -685,22 +685,11 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     window.addEventListener('pageshow', (event) => {
       console.log('📱 Mobile: Page show event triggered');
       if (isMobile) {
-        // Check if we have pending tracking data
-        const storedStartTime = localStorage.getItem('awayStartTime');
+        // Just clear any pending tracking data - analytics should have been sent while away
         const trackingActive = localStorage.getItem('awayTrackingActive');
         
-        if (storedStartTime && trackingActive === 'true') {
-          const timeAway = Date.now() - parseInt(storedStartTime);
-          const timeAwaySeconds = Math.floor(timeAway / 1000);
-          
-          console.log('📱 Mobile: Recovered tracking data - Time away:', timeAwaySeconds, 'seconds');
-          
-          if (timeAwaySeconds >= 90) {
-            console.log('🚨 Mobile: User was away for 90+ seconds - Sending analytics on return!');
-            this.sendAwayAnalytics(timeAwaySeconds);
-          }
-          
-          // Clear tracking data
+        if (trackingActive === 'true') {
+          console.log('📱 Mobile: User returned - clearing tracking data (analytics should have been sent while away)');
           localStorage.removeItem('awayStartTime');
           localStorage.removeItem('awayTrackingActive');
         }
@@ -728,23 +717,11 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     if (isMobile) {
       console.log('📱 Mobile recovery check on page load');
       
-      // Check for any pending tracking data from previous session
-      const storedStartTime = localStorage.getItem('awayStartTime');
+      // Just clear any stale tracking data - analytics should have been sent while away
       const trackingActive = localStorage.getItem('awayTrackingActive');
       
-      if (storedStartTime && trackingActive === 'true') {
-        const timeAway = Date.now() - parseInt(storedStartTime);
-        const timeAwaySeconds = Math.floor(timeAway / 1000);
-        
-        console.log('📱 Mobile: Found pending tracking data');
-        console.log('📱 Time away from previous session:', timeAwaySeconds, 'seconds');
-        
-        if (timeAwaySeconds >= 90) {
-          console.log('🚨 Mobile: Previous session was away for 90+ seconds - Sending analytics!');
-          this.sendAwayAnalytics(timeAwaySeconds);
-        }
-        
-        // Clear the tracking data
+      if (trackingActive === 'true') {
+        console.log('📱 Mobile: Clearing stale tracking data (analytics should have been sent while away)');
         localStorage.removeItem('awayStartTime');
         localStorage.removeItem('awayTrackingActive');
       }
