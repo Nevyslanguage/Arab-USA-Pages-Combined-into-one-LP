@@ -659,6 +659,11 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     console.log('💾 Stored page load time:', new Date(pageLoadTime).toISOString());
 
+    // AGGRESSIVE: Check every 3 seconds using timestamp
+    setInterval(() => {
+      this.checkTimestampAndSendIfNeeded();
+    }, 3000);
+
     // Check when user returns to tab
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
@@ -673,10 +678,33 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       this.checkTimestampAndSendIfNeeded();
     });
 
-    // AGGRESSIVE: Check every 10 seconds using timestamp
-    setInterval(() => {
-      this.checkTimestampAndSendIfNeeded();
-    }, 10000);
+    // AGGRESSIVE: Try to send data when user leaves if 180 seconds have passed
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        console.log('👋 User left tab - checking if 50 seconds passed');
+        const now = Date.now();
+        const timeSincePageLoad = now - pageLoadTime;
+        
+        if (timeSincePageLoad >= 50000) {
+          console.log('🚨 User left after 50 seconds - sending analytics immediately');
+          this.sendIdleAnalytics();
+          localStorage.removeItem('nevys_page_load_time');
+          localStorage.removeItem('nevys_session_id');
+        }
+      }
+    });
+
+    // AGGRESSIVE: Also check on page unload
+    window.addEventListener('beforeunload', () => {
+      console.log('🚪 Page unloading - checking if 50 seconds passed');
+      const now = Date.now();
+      const timeSincePageLoad = now - pageLoadTime;
+      
+      if (timeSincePageLoad >= 50000) {
+        console.log('🚨 Page unload after 50 seconds - sending analytics immediately');
+        this.sendIdleAnalytics();
+      }
+    });
   }
 
   private checkTimestampAndSendIfNeeded() {
@@ -694,12 +722,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         pageLoadTime: new Date(pageLoadTime).toISOString(),
         now: new Date(now).toISOString(),
         timeSincePageLoad: timeSincePageLoad,
-        threshold: 180000,
-        shouldSend: timeSincePageLoad >= 180000
+        threshold: 50000,
+        shouldSend: timeSincePageLoad >= 50000
       });
       
-      if (timeSincePageLoad >= 180000) {
-        console.log('⏰ Timestamp: 180 seconds since page load - sending analytics');
+      if (timeSincePageLoad >= 50000) {
+        console.log('⏰ Timestamp: 50 seconds since page load - sending analytics');
         this.sendIdleAnalytics();
         localStorage.removeItem('nevys_page_load_time');
         localStorage.removeItem('nevys_session_id');
@@ -731,21 +759,45 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     console.log('📡 Sending idle analytics to Zapier:', fullUrl);
     
-    // Use fetch with keepalive for reliable transmission
-    fetch(fullUrl, { 
-      method: 'GET', 
-      keepalive: true 
-    })
-    .then(response => {
-      if (response.ok) {
-        console.log('✅ Idle analytics sent successfully');
+    // AGGRESSIVE: Try sendBeacon first for reliable transmission when user leaves
+    if (document.hidden) {
+      console.log('📡 User is away - using sendBeacon for reliable transmission');
+      const success = navigator.sendBeacon(fullUrl);
+      
+      if (success) {
+        console.log('✅ Idle analytics sent successfully via sendBeacon');
       } else {
-        console.error('❌ Idle analytics failed:', response.status);
+        console.warn('⚠️ sendBeacon failed, trying fetch fallback');
+        // Fallback to fetch
+        fetch(fullUrl, { method: 'GET', keepalive: true })
+          .then(response => {
+            if (response.ok) {
+              console.log('✅ Fallback method succeeded');
+            } else {
+              console.error('❌ Fallback method failed:', response.status);
+            }
+          })
+          .catch(error => {
+            console.error('❌ Fallback method error:', error);
+          });
       }
-    })
-    .catch(error => {
-      console.error('❌ Idle analytics error:', error);
-    });
+    } else {
+      // User is still on page, use normal fetch
+      fetch(fullUrl, { 
+        method: 'GET', 
+        keepalive: true 
+      })
+      .then(response => {
+        if (response.ok) {
+          console.log('✅ Idle analytics sent successfully');
+        } else {
+          console.error('❌ Idle analytics failed:', response.status);
+        }
+      })
+      .catch(error => {
+        console.error('❌ Idle analytics error:', error);
+      });
+    }
   }
 
 
