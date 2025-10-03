@@ -560,7 +560,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   private setupPageVisibilityTracking() {
     let hiddenStartTime: number | null = null;
     let awayTimer: any = null;
-    let awayInterval: any = null;
     
     // Mobile-friendly approach: Use multiple fallback methods
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -578,31 +577,28 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         console.log('📱 Mobile device:', isMobile);
         
         if (isMobile) {
-          // Mobile: Use aggressive interval checking + localStorage backup
-          console.log('📱 Using mobile-friendly tracking');
+          // Mobile: Use same setTimeout approach as desktop, but with localStorage backup
+          console.log('📱 Using mobile-friendly tracking (same as desktop)');
           
           // Store in localStorage for persistence
           localStorage.setItem('awayStartTime', hiddenStartTime.toString());
           localStorage.setItem('awayTrackingActive', 'true');
           
-          // Use interval for more reliable mobile tracking
-          awayInterval = setInterval(() => {
+          // Use setTimeout just like desktop, but with mobile-friendly sendBeacon
+          awayTimer = setTimeout(() => {
             if (document.hidden && hiddenStartTime) {
               const timeAway = Date.now() - hiddenStartTime;
               const timeAwaySeconds = Math.floor(timeAway / 1000);
               
-              console.log('📱 Mobile interval check - Time away:', timeAwaySeconds, 'seconds');
+              console.log('🚨 Mobile: User has been away for 90+ seconds - Sending analytics NOW!');
+              console.log('⏱️ Time away:', timeAwaySeconds, 'seconds');
+              this.sendAwayAnalytics(timeAwaySeconds);
               
-              if (timeAwaySeconds >= 90) {
-                console.log('🚨 Mobile: User has been away for 90+ seconds - Sending analytics NOW!');
-                this.sendAwayAnalytics(timeAwaySeconds);
-                clearInterval(awayInterval);
-                awayInterval = null;
-                localStorage.removeItem('awayStartTime');
-                localStorage.removeItem('awayTrackingActive');
-              }
+              // Clear tracking data
+              localStorage.removeItem('awayStartTime');
+              localStorage.removeItem('awayTrackingActive');
             }
-          }, 5000); // Check every 5 seconds on mobile
+          }, 90000); // 90 seconds - same as desktop
           
         } else {
           // Desktop: Use setTimeout (more reliable on desktop)
@@ -636,13 +632,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           if (awayTimer) {
             clearTimeout(awayTimer);
             awayTimer = null;
-            console.log('✅ Desktop: User returned before 90 seconds - Analytics timer cancelled');
-          }
-          
-          if (awayInterval) {
-            clearInterval(awayInterval);
-            awayInterval = null;
-            console.log('✅ Mobile: User returned before 90 seconds - Analytics interval cancelled');
+            console.log('✅ User returned before 90 seconds - Analytics timer cancelled');
           }
           
           // Clear mobile tracking data
