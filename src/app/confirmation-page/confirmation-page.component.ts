@@ -250,8 +250,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Mobile recovery: Check for pending tracking data
     this.checkMobileRecovery();
     
-    // Test the webhook URL on page load
-    this.testConfirmationWebhook();
   }
 
   ngOnDestroy() {
@@ -977,71 +975,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private testConfirmationWebhook() {
-    console.log('🧪 Testing confirmation webhook URL...');
-    
-    // Send a simple test request to verify the webhook is working
-    const testUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf/?test=true&message=webhook_test';
-    
-    console.log('🔗 Test URL:', testUrl);
-    
-    fetch(testUrl, { method: 'GET' })
-      .then(response => {
-        console.log('📡 Test response status:', response.status);
-        console.log('📡 Test response headers:', response.headers);
-        
-        if (response.ok) {
-          console.log('✅ Confirmation webhook URL is working!');
-          return response.text();
-        } else {
-          console.log('❌ Confirmation webhook URL returned:', response.status, response.statusText);
-          return response.text();
-        }
-      })
-      .then(responseText => {
-        console.log('📄 Test response body:', responseText);
-      })
-      .catch(error => {
-        console.log('❌ Confirmation webhook URL test failed:', error);
-      });
-  }
-
-  private testSimpleDataFormat() {
-    console.log('🧪 Testing with simple data format (like lead-form)...');
-    
-    // Send data in the same format as the working lead-form
-    const params = new URLSearchParams();
-    params.set('first_name', this.urlParams.name || 'Test User');
-    params.set('last_name', 'Confirmation Test');
-    params.set('company', 'Nevy\'s Language Academy');
-    params.set('lead_source', 'Website Confirmation Page');
-    params.set('status', 'New');
-    params.set('email', this.urlParams.email || 'test@example.com');
-    params.set('trigger', 'confirmation_page_test');
-    params.set('test_message', 'This is a test from confirmation page');
-    
-    const testUrl = `https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf/?${params.toString()}`;
-    
-    console.log('🔗 Simple test URL:', testUrl);
-    
-    fetch(testUrl, { method: 'GET' })
-      .then(response => {
-        console.log('📡 Simple test response status:', response.status);
-        
-        if (response.ok) {
-          console.log('✅ Simple data format works! Webhook is receiving data.');
-        } else {
-          console.log('❌ Simple data format failed:', response.status, response.statusText);
-        }
-        return response.text();
-      })
-      .then(responseText => {
-        console.log('📄 Simple test response body:', responseText);
-      })
-      .catch(error => {
-        console.log('❌ Simple data format test failed:', error);
-      });
-  }
 
   private formatAwayAnalyticsDescription(events: any, timeAwaySeconds: number): string {
     let description = `Away Analytics - User Was Away for 90+ Seconds\n\n`;
@@ -2309,12 +2242,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.formSubmitted = true;
     console.log('✅ Form submitted - User completed the form');
     console.log('🔍 continueWithFormSubmission - selectedChoice:', this.selectedChoice);
-    
-    // Send lead update data to Zapier
-    this.sendLeadUpdateToZapier();
-    
-    // Send tracking data when form submission starts
-    this.sendTrackingData('form_submission_start');
     
     // If user cancels, show thanks message directly
     if (this.selectedChoice === 'cancel') {

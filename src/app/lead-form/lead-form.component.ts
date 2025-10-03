@@ -14,8 +14,6 @@ import { getMaxDigitsForCountry } from '.././country-digit-limits';
   styleUrl: './lead-form.component.css'
 })
 export class LeadFormComponent implements OnInit {
-  // Development flag to disable Zapier calls during development
-  private readonly isDevelopment = false; // Disabled to allow localhost testing
   
   title = 'arableadform';
   leadForm: FormGroup;
@@ -242,85 +240,8 @@ export class LeadFormComponent implements OnInit {
   }
 
   sendToZapier(formData: any) {
-    // In development mode, just log the data without making API calls
-    if (this.isDevelopment) {
-      console.log('🔧 Development mode (localhost): Logging lead form data (no Zapier API call)');
-      console.log('📊 Lead form data that would be sent:');
-      console.log(JSON.stringify(formData, null, 2));
-      
-      // Still navigate to confirmation page in development
-      this.navigateToConfirmation(formData);
-      return;
-    }
-    
-    // Your actual Zapier webhook URL
-    // const zapierWebhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1dshm2/';
-    const zapierWebhookUrl = 'https://hook.us1.make.com/bsfdoly1dekmske3r620ydu5p3d3hnor';
-    
-    try {
-      // Create URL parameters for the webhook (matching successful pattern)
-      const params = new URLSearchParams();
-      
-      // Basic lead information (matching Salesforce format)
-      params.set('first_name', formData.name || '');
-      params.set('last_name', 'Nevys Student');
-      params.set('company', 'Nevy\'s Language Academy');
-      params.set('lead_source', 'Website Landing Page');
-      params.set('status', 'New');
-      
-      // Contact information
-      params.set('email', formData.email || '');
-      params.set('phone', this.formatPhoneForSubmission(formData.phone) || '');
-      params.set('whatsapp_same', formData.whatsappSame || '');
-      params.set('whatsapp_number', formData.whatsappSame === 'no' ? this.getFullWhatsAppNumber() : this.formatPhoneForSubmission(formData.phone) || '');
-      
-      // Form responses
-      params.set('english_lessons_history', formData.englishLessonsHistory || '');
-      params.set('level_preference', formData.levelPreference || '');
-      params.set('best_time_to_contact', formData.availability || '');
-      params.set('detailed_contact_time', formData.specificTimeSlot || '');
-      params.set('state', formData.state || '');
-      
-      // Facebook campaign tracking data
-      params.set('campaign_name', formData.campaignName || '');
-      params.set('adset_name', formData.adsetName || '');
-      params.set('ad_name', formData.adName || '');
-      params.set('fb_click_id', formData.fbClickId || '');
-      
-      // Additional metadata
-      params.set('submission_date', new Date().toISOString());
-      params.set('source_url', window.location.href);
-      
-      // Formatted description for Salesforce
-      params.set('description', this.formatFormDataForDescription(formData));
-
-      console.log('=== ZAPIER WEBHOOK DEBUG ===');
-      console.log('Webhook URL:', zapierWebhookUrl);
-      console.log('Parameters being sent:', params.toString());
-
-      // Send as GET request with query parameters (matching successful pattern)
-      this.http.get(`${zapierWebhookUrl}?${params.toString()}`).subscribe({
-        next: (response) => {
-          console.log('=== ZAPIER SUCCESS ===');
-          console.log('Data sent to Zapier successfully:', response);
-          
-          // Navigate to confirmation page with parameters
-          this.navigateToConfirmation(formData);
-        },
-        error: (error) => {
-          console.error('=== ZAPIER ERROR ===');
-          console.error('Error sending to Zapier:', error);
-          
-          // Even if Zapier fails, still navigate to confirmation page
-          this.navigateToConfirmation(formData);
-        }
-      });
-    } catch (error) {
-      console.error('Error preparing Zapier request:', error);
-      
-      // Even if preparation fails, still navigate to confirmation page
-      this.navigateToConfirmation(formData);
-    }
+    // Navigate directly to confirmation page
+    this.navigateToConfirmation(formData);
   }
 
   // Navigate to confirmation page with parameters
