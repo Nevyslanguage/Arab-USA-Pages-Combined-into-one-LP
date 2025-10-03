@@ -63,7 +63,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     total: 0,
     lastActivity: 0,
     isIdle: false,
-    idleThreshold: 180000 // 180 seconds total inactivity
+    idleThreshold: 60000 // 60 seconds total inactivity
   };
   private idleTimer: any = null;
   private idlePopupTimer: any = null;
@@ -242,12 +242,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.initializeTracking();
     this.setupIntersectionObservers();
     this.setupIdleTracking();
-    this.setupPageUnloadTracking();
-    this.setupBackgroundTracking();
     this.setupScrollDetection();
     
-    // Start the 180-second timer
-    this.resetIdleTimer();
+    // Start the simple 60-second timer
+    this.startSimpleIdleTracking();
   }
 
   ngOnDestroy() {
@@ -387,7 +385,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     activityEvents.forEach(event => {
       document.addEventListener(event, () => {
-        this.resetIdleTimer();
+        this.startSimpleIdleTracking();
       }, true);
     });
     
@@ -402,7 +400,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           // User is actively viewing a section - consider this as activity
-          this.resetIdleTimer();
+          this.startSimpleIdleTracking();
           console.log('👀 User actively viewing section:', entry.target.id);
         }
       });
@@ -419,341 +417,70 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }, 100);
   }
 
-  private resetIdleTimer() {
-    // Don't reset timer if idle popup is already showing or thank you screen is showing
-    if (this.showIdlePopup || this.showThankYouScreen) {
-      return;
-    }
-    
-    // Update last activity time
-    this.idleTime.lastActivity = Date.now();
-    
-    // Clear existing timer
-    if (this.idleTimer) {
-      clearTimeout(this.idleTimer);
-    }
-    if (this.idlePopupTimer) {
-      clearTimeout(this.idlePopupTimer);
-    }
-    
-    // Set new 90-second timer to show popup
-    if (!this.showThankYouScreen) {
-      console.log('🔄 Starting 90-second timer for popup');
-      this.idleTimer = setTimeout(() => {
-        this.showIdlePopup = true;
-        document.body.style.overflow = 'hidden';
-        console.log('💬 Showing idle popup - asking if user is still there');
-        
-        // Start another 90-second timer for popup interaction
-        this.idlePopupTimer = setTimeout(() => {
-          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-          this.sendTrackingData('idle_timeout_180_seconds');
-        }, 90000); // Another 90 seconds
-      }, 90000); // 90 seconds to show popup
-    }
-  }
-
-  private setupPageUnloadTracking() {
-    window.addEventListener('beforeunload', () => {
-      console.log('🚪 Page unloading - sending tracking data');
-      this.storeIdleState(); // Store state before sending data
-      this.sendTrackingData('page_unload');
-    });
-    
-    // Handle page visibility changes (tab switching, app switching)
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        console.log('👋 User left tab');
-      } else {
-        console.log('👋 User returned to tab - checking if 180 seconds passed');
-        this.checkIf180SecondsPassed();
-      }
-    });
-  }
-
-  private storeIdleState() {
-    const idleState = {
-      lastActivity: this.idleTime.lastActivity,
-      total: this.idleTime.total,
-      isIdle: this.idleTime.isIdle,
-      popupShownAt: this.idleTime.popupShownAt,
-      timestamp: Date.now(),
-      sessionId: this.sessionId
-    };
-    
-    try {
-      localStorage.setItem('nevys_idle_state', JSON.stringify(idleState));
-      console.log('💾 Idle state stored:', idleState);
-    } catch (e) {
-      console.warn('⚠️ Could not store idle state:', e);
-    }
-  }
-
-  private restoreIdleState() {
-    try {
-      const stored = localStorage.getItem('nevys_idle_state');
-      if (!stored) return;
-      
-      const idleState = JSON.parse(stored);
-      
-      // Only restore if it's the same session
-      if (idleState.sessionId !== this.sessionId) {
-        localStorage.removeItem('nevys_idle_state');
-        return;
-      }
-      
-      const now = Date.now();
-      const timeAway = now - idleState.timestamp;
-      
-      console.log('🔄 Restoring idle state:', {
-        timeAway: timeAway,
-        wasIdle: idleState.isIdle,
-        storedLastActivity: idleState.lastActivity
-      });
-      
-      // If user was idle when they left, add the time away to total idle time
-      if (idleState.isIdle) {
-        this.idleTime.total = idleState.total + timeAway;
-        this.idleTime.popupShownAt = idleState.popupShownAt;
-        console.log('⏰ User was idle when they left - adding time away to total');
-        
-        // Check if popup was shown and if 90 seconds have passed since then
-        if (idleState.popupShownAt) {
-          const timeSincePopup = now - idleState.popupShownAt;
-          if (timeSincePopup >= this.idleTime.idleThreshold) {
-            // 180 seconds total inactivity - send analytics immediately
-            console.log('⏰ 180 seconds total inactivity detected - sending analytics immediately');
-            this.sendTrackingData('idle_timeout_180_seconds');
-            return;
-          } else {
-            // Show popup and continue timer
-            this.showIdlePopup = true;
-            document.body.style.overflow = 'hidden';
-            const remainingTime = this.idleTime.idleThreshold - timeSincePopup;
-            this.idlePopupTimer = setTimeout(() => {
-              console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-              this.sendTrackingData('idle_timeout_180_seconds');
-            }, remainingTime);
-            console.log('💬 User returned while popup was active - continuing timer');
-          }
-        }
-      } else {
-        // If user wasn't idle, check if they've been away long enough to be considered idle
-        const totalInactiveTime = now - idleState.lastActivity;
-        if (totalInactiveTime >= this.idleTime.idleThreshold) {
-          // They've been inactive long enough - show popup immediately
-          this.idleTime.isIdle = true;
-          this.idleTime.total = idleState.total + (totalInactiveTime - this.idleTime.idleThreshold);
-          this.showIdlePopup = true;
-          document.body.style.overflow = 'hidden';
-          console.log('💬 User returned after long inactivity - showing popup immediately');
-          
-          // Start popup timer for additional 90 seconds
-          this.idlePopupTimer = setTimeout(() => {
-            console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-            this.sendTrackingData('idle_timeout_180_seconds');
-          }, this.idleTime.idleThreshold);
-        } else {
-          // Not idle yet - continue normal tracking
-          this.idleTime.lastActivity = idleState.lastActivity;
-          this.idleTime.total = idleState.total;
-          this.resetIdleTimer();
-        }
-      }
-      
-      // Clean up stored state
-      localStorage.removeItem('nevys_idle_state');
-      
-    } catch (e) {
-      console.warn('⚠️ Could not restore idle state:', e);
-      localStorage.removeItem('nevys_idle_state');
-    }
-  }
-
-  private checkStoredIdleTimeout() {
-    try {
-      const stored = localStorage.getItem('nevys_idle_state');
-      if (!stored) return;
-      
-      const idleState = JSON.parse(stored);
-      
-      // Only check if it's the same session
-      if (idleState.sessionId !== this.sessionId) {
-        localStorage.removeItem('nevys_idle_state');
-        return;
-      }
-      
-      const now = Date.now();
-      
-      // Check if popup was shown and if 90 seconds have passed since then
-      if (idleState.popupShownAt) {
-        const timeSincePopup = now - idleState.popupShownAt;
-        if (timeSincePopup >= this.idleTime.idleThreshold) {
-          // 180 seconds total inactivity - send analytics immediately
-          console.log('⏰ 180 seconds total inactivity detected on page load - sending analytics immediately');
-          this.sendTrackingData('idle_timeout_180_seconds');
-          localStorage.removeItem('nevys_idle_state');
-          return;
-        }
-      }
-      
-    } catch (e) {
-      console.warn('⚠️ Could not check stored idle timeout:', e);
-      localStorage.removeItem('nevys_idle_state');
-    }
-  }
-
-  private setupMobileSafariBackup() {
-    // Simple backup: Check if 180 seconds have passed when tab becomes visible
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        console.log('👋 Tab became visible - checking if 180 seconds passed');
-        this.checkIf180SecondsPassed();
-      }
-    });
-    
-    // Also check on page focus
-    window.addEventListener('focus', () => {
-      console.log('👋 Page focused - checking if 180 seconds passed');
-      this.checkIf180SecondsPassed();
-    });
-  }
-
-  private checkIf180SecondsPassed() {
-    const now = Date.now();
-    const timeSinceLastActivity = now - this.idleTime.lastActivity;
-    
-    console.log('🔍 Checking if 180 seconds passed:', {
-      timeSinceLastActivity: timeSinceLastActivity,
-      threshold: 180000,
-      shouldSend: timeSinceLastActivity >= 180000
-    });
-    
-    if (timeSinceLastActivity >= 180000) {
-      console.log('⏰ 180 seconds total inactivity detected - sending analytics');
-      this.sendTrackingData('idle_timeout_180_seconds');
-    } else if (timeSinceLastActivity >= 90000) {
-      // Show popup if 90 seconds have passed
-      if (!this.showIdlePopup) {
-        this.showIdlePopup = true;
-        document.body.style.overflow = 'hidden';
-        console.log('💬 Showing idle popup - asking if user is still there');
-        
-        // Start timer for popup interaction
-        this.idlePopupTimer = setTimeout(() => {
-          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-          this.sendTrackingData('idle_timeout_180_seconds');
-        }, 90000); // Another 90 seconds
-      }
-    }
-  }
-
-  private setupBackgroundTracking() {
-    // Store the page load time for timestamp-based tracking
+  private startSimpleIdleTracking() {
+    // Store page load time for background tracking
     const pageLoadTime = Date.now();
     localStorage.setItem('nevys_page_load_time', pageLoadTime.toString());
     localStorage.setItem('nevys_session_id', this.sessionId);
     
-    console.log('💾 Stored page load time:', new Date(pageLoadTime).toISOString());
-    console.log('🔧 Development mode disabled - will send real data to Zapier');
-
-    // AGGRESSIVE: Check every 3 seconds using timestamp
-    setInterval(() => {
-      this.checkTimestampAndSendIfNeeded();
-    }, 3000);
-
-    // Check when user returns to tab
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        console.log('👋 User returned to tab - checking timestamp');
-        this.checkTimestampAndSendIfNeeded();
-      }
-    });
-
-    // Also check on page focus
-    window.addEventListener('focus', () => {
-      console.log('👋 Page focused - checking timestamp');
-      this.checkTimestampAndSendIfNeeded();
-    });
-
-    // AGGRESSIVE: Try to send data when user leaves if 180 seconds have passed
+    console.log('💾 Simple idle tracking started - page load time stored');
+    
+    // Start 60-second timer to show popup
+    this.idleTimer = setTimeout(() => {
+      this.showIdlePopup = true;
+      this.idleTime.popupShownAt = Date.now();
+      document.body.style.overflow = 'hidden';
+      console.log('💬 Idle popup shown after 60 seconds');
+    }, 60000); // 60 seconds
+    
+    // Track when user leaves the page
+    let userLeftTime: number | null = null;
+    
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        console.log('👋 User left tab - checking if 50 seconds passed');
-        const now = Date.now();
-        const timeSincePageLoad = now - pageLoadTime;
+        // User left the page - record the time
+        userLeftTime = Date.now();
+        console.log('👋 User left tab at:', new Date(userLeftTime).toISOString());
         
-        console.log('🕐 Time check on visibility change:', {
-          timeSincePageLoad: timeSincePageLoad,
-          threshold: 50000,
-          shouldSend: timeSincePageLoad >= 50000
-        });
-        
-        if (timeSincePageLoad >= 50000) {
-          console.log('🚨 User left after 50 seconds - sending analytics immediately');
-          this.sendIdleAnalytics();
-          localStorage.removeItem('nevys_page_load_time');
-          localStorage.removeItem('nevys_session_id');
-        } else {
-          console.log('⏳ Not enough time passed yet:', Math.round(timeSincePageLoad / 1000), 'seconds');
+        // Start a 60-second timer to send analytics if they don't return
+        setTimeout(() => {
+          // Check if user is still away (page still hidden)
+          if (document.hidden && userLeftTime) {
+            const timeAway = Date.now() - userLeftTime;
+            if (timeAway >= 60000) {
+              console.log('⏰ User has been away for 60+ seconds - sending analytics');
+              this.sendIdleAnalytics();
+              userLeftTime = null; // Reset
+            }
+          }
+        }, 60000); // Wait 60 seconds after they left
+      } else {
+        // User returned to the page - cancel the timer
+        if (userLeftTime) {
+          const timeAway = Date.now() - userLeftTime;
+          console.log('👋 User returned after being away for:', Math.round(timeAway / 1000), 'seconds');
+          userLeftTime = null; // Reset
         }
       }
     });
-
-    // AGGRESSIVE: Also check on page unload
+    
+    // Also check on page unload (browser close)
     window.addEventListener('beforeunload', () => {
-      console.log('🚪 Page unloading - checking if 50 seconds passed');
-      const now = Date.now();
-      const timeSincePageLoad = now - pageLoadTime;
-      
-      if (timeSincePageLoad >= 50000) {
-        console.log('🚨 Page unload after 50 seconds - sending analytics immediately');
-        this.sendIdleAnalytics();
-      }
-    });
-
-    // ✅ Add pagehide event for even more reliable detection
-    window.addEventListener('pagehide', () => {
-      console.log('🚪 Page hide event - checking if 50 seconds passed');
-      const now = Date.now();
-      const timeSincePageLoad = now - pageLoadTime;
-      
-      if (timeSincePageLoad >= 50000) {
-        console.log('🚨 Page hide after 50 seconds - sending analytics immediately');
-        this.sendIdleAnalytics();
+      if (userLeftTime) {
+        const timeAway = Date.now() - userLeftTime;
+        if (timeAway >= 60000) {
+          console.log('🚪 Page unloading after 60+ seconds away - sending analytics');
+          this.sendIdleAnalytics();
+        }
       }
     });
   }
+  
 
-  private checkTimestampAndSendIfNeeded() {
-    try {
-      const stored = localStorage.getItem('nevys_page_load_time');
-      const sessionId = localStorage.getItem('nevys_session_id');
-      
-      if (!stored || sessionId !== this.sessionId) return;
-      
-      const pageLoadTime = parseInt(stored);
-      const now = Date.now();
-      const timeSincePageLoad = now - pageLoadTime;
-      
-      console.log('🕐 Timestamp check:', {
-        pageLoadTime: new Date(pageLoadTime).toISOString(),
-        now: new Date(now).toISOString(),
-        timeSincePageLoad: timeSincePageLoad,
-        threshold: 50000,
-        shouldSend: timeSincePageLoad >= 50000
-      });
-      
-      if (timeSincePageLoad >= 50000) {
-        console.log('⏰ Timestamp: 50 seconds since page load - sending analytics');
-        this.sendIdleAnalytics();
-        localStorage.removeItem('nevys_page_load_time');
-        localStorage.removeItem('nevys_session_id');
-      }
-    } catch (e) {
-      console.warn('⚠️ Could not check timestamp:', e);
-    }
-  }
+
+
+
+
 
   private sendIdleAnalytics() {
     console.log('🚀 sendIdleAnalytics called - preparing to send data');
@@ -784,7 +511,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.log('🔧 Development mode: Logging idle analytics (no Zapier API call)');
       console.log('📊 Idle analytics data that would be sent:');
       console.log({
-        trigger: 'idle_timeout_50_seconds',
+        trigger: 'idle_timeout_60_seconds',
         sessionId: this.sessionId,
         timestamp: new Date().toISOString(),
         name: this.urlParams.name || '',
@@ -805,7 +532,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Prepare URL parameters (matching your existing pattern)
     const params = new URLSearchParams();
-    params.set('trigger', 'idle_timeout_50_seconds');
+    params.set('trigger', 'idle_timeout_60_seconds');
     params.set('sessionId', this.sessionId);
     params.set('timestamp', new Date().toISOString());
     params.set('name', this.urlParams.name || '');
@@ -881,10 +608,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   private formatIdleAnalyticsDescription(events: any): string {
-    let description = `Idle Analytics - User Left Page After 50 Seconds\n\n`;
+    let description = `Idle Analytics - User Left Page After 60 Seconds\n\n`;
     
     // Basic information
-    description += `Trigger: Idle Timeout (50 seconds)\n`;
+    description += `Trigger: Idle Timeout (60 seconds)\n`;
     description += `Session ID: ${this.sessionId}\n`;
     description += `User: ${this.urlParams.name || 'Unknown'}\n`;
     description += `Email: ${this.urlParams.email || 'Unknown'}\n`;
@@ -2271,7 +1998,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
     
     // Reset the idle timer to start fresh
-    this.resetIdleTimer();
+    this.startSimpleIdleTracking();
     console.log('💬 Idle popup closed - user is active again');
   }
 
@@ -2279,7 +2006,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     this.closeIdlePopup();
     
     // Reset idle timer when user chooses to stay
-    this.resetIdleTimer();
+    this.startSimpleIdleTracking();
     
     console.log('💬 User chose to stay on page - idle timer reset');
   }
@@ -2304,156 +2031,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     console.log('🔍 showThankYouScreen value:', this.showThankYouScreen);
   }
 
-  private storePopupWhileAway() {
-    try {
-      const popupWhileAwayData = {
-        popupShownAt: this.idleTime.popupShownAt,
-        sessionId: this.sessionId,
-        timestamp: Date.now(),
-        userLeftWhilePopupShowing: true
-      };
-      
-      localStorage.setItem('nevys_popup_while_away', JSON.stringify(popupWhileAwayData));
-      console.log('💾 Stored popup while away data:', popupWhileAwayData);
-    } catch (e) {
-      console.warn('⚠️ Could not store popup while away data:', e);
-    }
-  }
-
-  private checkPopupWhileAway() {
-    try {
-      const stored = localStorage.getItem('nevys_popup_while_away');
-      if (!stored) return;
-      
-      const popupData = JSON.parse(stored);
-      
-      // Only check if it's the same session
-      if (popupData.sessionId !== this.sessionId) {
-        localStorage.removeItem('nevys_popup_while_away');
-        return;
-      }
-      
-      const now = Date.now();
-      const timeSincePopup = now - popupData.popupShownAt;
-      
-      console.log('🔍 Checking popup shown while away:', {
-        timeSincePopup: timeSincePopup,
-        threshold: this.idleTime.idleThreshold,
-        shouldSend: timeSincePopup >= this.idleTime.idleThreshold
-      });
-      
-      if (timeSincePopup >= this.idleTime.idleThreshold) {
-        // 180 seconds total inactivity - send analytics immediately
-        console.log('⏰ Popup while away: 180 seconds total inactivity - sending analytics immediately');
-        this.sendTrackingData('idle_timeout_180_seconds');
-        this.showIdlePopup = false;
-        document.body.style.overflow = 'auto';
-        localStorage.removeItem('nevys_popup_while_away');
-      } else {
-        // Show popup and continue timer
-        this.idleTime.popupShownAt = popupData.popupShownAt;
-        this.showIdlePopup = true;
-        document.body.style.overflow = 'hidden';
-        
-        const remainingTime = this.idleTime.idleThreshold - timeSincePopup;
-        this.idlePopupTimer = setTimeout(() => {
-          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-          this.sendTrackingData('idle_timeout_180_seconds');
-        }, remainingTime);
-        
-        console.log('💬 Restored popup that was shown while away, remaining time:', remainingTime);
-        localStorage.removeItem('nevys_popup_while_away');
-      }
-      
-    } catch (e) {
-      console.warn('⚠️ Could not check popup while away data:', e);
-      localStorage.removeItem('nevys_popup_while_away');
-    }
-  }
-
-  private checkStoredTimeoutAndSendIfNeeded() {
-    try {
-      const stored = localStorage.getItem('nevys_idle_timeout');
-      if (!stored) return;
-      
-      const timeoutData = JSON.parse(stored);
-      
-      // Only check if it's the same session
-      if (timeoutData.sessionId !== this.sessionId) {
-        localStorage.removeItem('nevys_idle_timeout');
-        return;
-      }
-      
-      const now = Date.now();
-      const timeSincePopup = now - timeoutData.popupShownAt;
-      
-      console.log('🔍 AGGRESSIVE stored timeout check:', {
-        timeSincePopup: timeSincePopup,
-        threshold: this.idleTime.idleThreshold,
-        shouldSend: timeSincePopup >= this.idleTime.idleThreshold,
-        userAway: document.hidden
-      });
-      
-      if (timeSincePopup >= this.idleTime.idleThreshold) {
-        // 180 seconds total inactivity - send analytics immediately
-        console.log('⏰ AGGRESSIVE stored timeout: 180 seconds total inactivity - sending analytics NOW');
-        this.sendTrackingData('idle_timeout_180_seconds');
-        localStorage.removeItem('nevys_idle_timeout');
-      }
-      
-    } catch (e) {
-      console.warn('⚠️ Could not check stored timeout data aggressively:', e);
-      localStorage.removeItem('nevys_idle_timeout');
-    }
-  }
-
-  private checkStoredIdleTimeoutData() {
-    try {
-      const stored = localStorage.getItem('nevys_idle_timeout');
-      if (!stored) return;
-      
-      const timeoutData = JSON.parse(stored);
-      
-      // Only check if it's the same session
-      if (timeoutData.sessionId !== this.sessionId) {
-        localStorage.removeItem('nevys_idle_timeout');
-        return;
-      }
-      
-      const now = Date.now();
-      const timeSincePopup = now - timeoutData.popupShownAt;
-      
-      console.log('🔍 Checking stored idle timeout data:', {
-        timeSincePopup: timeSincePopup,
-        threshold: this.idleTime.idleThreshold,
-        shouldSend: timeSincePopup >= this.idleTime.idleThreshold
-      });
-      
-      if (timeSincePopup >= this.idleTime.idleThreshold) {
-        // 180 seconds total inactivity - send analytics immediately
-        console.log('⏰ Stored timeout: 180 seconds total inactivity - sending analytics immediately');
-        this.sendTrackingData('idle_timeout_180_seconds');
-        localStorage.removeItem('nevys_idle_timeout');
-      } else {
-        // Restore the popup and continue tracking
-        this.idleTime.popupShownAt = timeoutData.popupShownAt;
-        this.showIdlePopup = true;
-        document.body.style.overflow = 'hidden';
-        
-        const remainingTime = this.idleTime.idleThreshold - timeSincePopup;
-        this.idlePopupTimer = setTimeout(() => {
-          console.log('⏰ 180 seconds total inactivity - sending analytics automatically');
-          this.sendTrackingData('idle_timeout_180_seconds');
-        }, remainingTime);
-        
-        console.log('💬 Restored idle popup with remaining time:', remainingTime);
-      }
-      
-    } catch (e) {
-      console.warn('⚠️ Could not check stored idle timeout data:', e);
-      localStorage.removeItem('nevys_idle_timeout');
-    }
-  }
 
 
 
