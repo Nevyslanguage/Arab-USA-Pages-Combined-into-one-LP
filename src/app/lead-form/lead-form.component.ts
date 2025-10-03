@@ -254,7 +254,8 @@ export class LeadFormComponent implements OnInit {
     }
     
     // Your actual Zapier webhook URL
-    const zapierWebhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1dshm2/';
+    // const zapierWebhookUrl = 'https://hooks.zapier.com/hooks/catch/4630879/u1dshm2/';
+    const zapierWebhookUrl = 'https://hook.us1.make.com/bsfdoly1dekmske3r620ydu5p3d3hnor';
     
     try {
       // Create URL parameters for the webhook (matching successful pattern)
