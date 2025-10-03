@@ -556,6 +556,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   private setupPageVisibilityTracking() {
     let hiddenStartTime: number | null = null;
+    let awayTimer: any = null;
     
     // Track when page becomes hidden/visible
     document.addEventListener('visibilitychange', () => {
@@ -566,6 +567,18 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         console.log('📊 Visibility State:', document.visibilityState);
         console.log('🕐 Hidden at:', new Date().toISOString());
         console.log('⏱️ Hidden start time recorded:', hiddenStartTime);
+        
+        // Start a timer to check if they stay away for 90 seconds
+        awayTimer = setTimeout(() => {
+          if (document.hidden && hiddenStartTime) {
+            const timeAway = Date.now() - hiddenStartTime;
+            const timeAwaySeconds = Math.floor(timeAway / 1000);
+            
+            console.log('🚨 User has been away for 90+ seconds - Sending analytics NOW!');
+            console.log('⏱️ Time away:', timeAwaySeconds, 'seconds');
+            this.sendAwayAnalytics(timeAwaySeconds);
+          }
+        }, 90000); // 90 seconds
         
         this.logPageVisibilityChange('hidden');
       } else {
@@ -580,13 +593,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           console.log('⏱️ Time spent away:', timeAwaySeconds, 'seconds');
           console.log('⏱️ Time away formatted:', this.formatTime(timeAwaySeconds));
           
-               // Check if user was away for more than 90 seconds
-               if (timeAwaySeconds >= 90) {
-                 console.log('🚨 User was away for 90+ seconds - Sending analytics!');
-                 this.sendAwayAnalytics(timeAwaySeconds);
-               } else {
-                 console.log('✅ User was away for less than 90 seconds - No analytics sent');
-               }
+          // Cancel the away timer since user returned
+          if (awayTimer) {
+            clearTimeout(awayTimer);
+            awayTimer = null;
+            console.log('✅ User returned before 90 seconds - Analytics timer cancelled');
+          }
           
           hiddenStartTime = null;
         } else {
