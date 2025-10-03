@@ -265,7 +265,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
     
     // Send tracking data before component is destroyed (page closing)
-    this.sendFormDataToZapier();
+    this.sendTrackingData('page_closing');
   }
 
   // ===== TRACKING SYSTEM METHODS =====
@@ -967,8 +967,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       // --- ✅ Use the EXACT same method as confirm/cancel actions ---
       console.log('ℹ️ Using sendTrackingData method (same as confirm/cancel)');
       
-      // Use the same sendFormDataToZapier method for consistency
-      this.sendFormDataToZapier();
+      // Use the same sendTrackingData method that works for confirm/cancel
+      this.sendTrackingData('user_away_for_60_plus_seconds');
 
     } catch (error) {
       console.error('❌ Error sending away analytics:', error);
@@ -1095,23 +1095,14 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       trigger: trigger,
       timestamp: new Date().toISOString(),
       total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
       user_agent: navigator.userAgent,
       page_url: window.location.href,
       
       // Form interaction data
       form_started: this.formStarted,
       form_submitted: this.formSubmitted,
-      form_interaction_time: this.formStarted && this.formStartTime > 0 ? Math.round((Date.now() - this.formStartTime) / 1000) : 0,
-      
-      // Session duration data as separate parameters (formatted as MM:SS)
-      session_duration_on_price_section: this.formatTime(events.session_duration_on_price_section),
-      session_duration_on_levels_section: this.formatTime(events.session_duration_on_levels_section),
-      session_duration_on_teachers_section: this.formatTime(events.session_duration_on_teachers_section),
-      session_duration_on_platform_section: this.formatTime(events.session_duration_on_platform_section),
-      session_duration_on_advisors_section: this.formatTime(events.session_duration_on_advisors_section),
-      session_duration_on_testimonials_section: this.formatTime(events.session_duration_on_testimonials_section),
-      session_duration_on_form_section: this.formatTime(events.session_duration_on_form_section),
-      session_idle_time_duration: this.formatTime(events.session_idle_time_duration)
+      form_interaction_time: this.formStarted && this.formStartTime > 0 ? Math.round((Date.now() - this.formStartTime) / 1000) : 0
     };
 
     // Add formatted description after the object is created
@@ -1196,20 +1187,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         trigger: 'form_submission',
         timestamp: new Date().toISOString(),
         totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
+        events: events,
         userAgent: navigator.userAgent,
         pageUrl: window.location.href,
         formStarted: this.formStarted,
         formSubmitted: this.formSubmitted,
-        formInteractionTime: formInteractionTime,
-        // Session duration data as separate parameters (formatted as MM:SS)
-        session_duration_on_price_section: this.formatTime(events.session_duration_on_price_section),
-        session_duration_on_levels_section: this.formatTime(events.session_duration_on_levels_section),
-        session_duration_on_teachers_section: this.formatTime(events.session_duration_on_teachers_section),
-        session_duration_on_platform_section: this.formatTime(events.session_duration_on_platform_section),
-        session_duration_on_advisors_section: this.formatTime(events.session_duration_on_advisors_section),
-        session_duration_on_testimonials_section: this.formatTime(events.session_duration_on_testimonials_section),
-        session_duration_on_form_section: this.formatTime(events.session_duration_on_form_section),
-        session_idle_time_duration: this.formatTime(events.session_idle_time_duration)
+        formInteractionTime: formInteractionTime
       };
 
     try {
@@ -1341,21 +1324,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       trigger: 'form_submission_start',
       timestamp: new Date().toISOString(),
       total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
       user_agent: navigator.userAgent,
       page_url: window.location.href,
       form_started: this.formStarted,
       form_submitted: this.formSubmitted,
-      form_interaction_time: formInteractionTime,
-      
-      // Session duration data as separate parameters (formatted as MM:SS)
-      session_duration_on_price_section: this.formatTime(events.session_duration_on_price_section),
-      session_duration_on_levels_section: this.formatTime(events.session_duration_on_levels_section),
-      session_duration_on_teachers_section: this.formatTime(events.session_duration_on_teachers_section),
-      session_duration_on_platform_section: this.formatTime(events.session_duration_on_platform_section),
-      session_duration_on_advisors_section: this.formatTime(events.session_duration_on_advisors_section),
-      session_duration_on_testimonials_section: this.formatTime(events.session_duration_on_testimonials_section),
-      session_duration_on_form_section: this.formatTime(events.session_duration_on_form_section),
-      session_idle_time_duration: this.formatTime(events.session_idle_time_duration)
+      form_interaction_time: formInteractionTime
     };
 
     console.log('📋 LEAD UPDATE DATA:', leadUpdateData);
@@ -2051,6 +2025,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Send form data using the new successful Zapier service
     this.sendFormDataToZapier();
 
+    // Send analytics data for final action (keep existing tracking)
+    this.sendLeadUpdateToZapier();
+
     // Handle cancellation - show thanks message instead of WhatsApp
     if (this.userSelections.choice === 'cancel') {
       this.closeVerificationPage();
@@ -2094,6 +2071,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Wrap in try-catch to prevent errors from breaking the UI
     try {
       this.sendFormDataToZapier();
+      this.sendLeadUpdateToZapier();
     } catch (error) {
       console.error('⚠️ Zapier integration failed, continuing with UI:', error);
     }
@@ -2358,7 +2336,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Send session data to Zapier if not already sent
     if (!this.sessionDataSent) {
-      this.sendFormDataToZapier();
+      this.sendSessionDataToZapier();
       this.sessionDataSent = true;
     }
     
@@ -2417,6 +2395,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       timestamp: new Date().toISOString(),
       total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
       interaction_level: interactionLevel,
+      events: events,
       user_agent: navigator.userAgent,
       page_url: window.location.href,
       
@@ -2430,17 +2409,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       cancellation_reasons: this.selectedCancellationReasons,
       subscription_preference: this.selectedSubscription,
       preferred_start_time: this.selectedStartTime,
-      payment_method_available: this.selectedPayment,
-      
-      // Session duration data as separate parameters (formatted as MM:SS)
-      session_duration_on_price_section: this.formatTime(events.session_duration_on_price_section),
-      session_duration_on_levels_section: this.formatTime(events.session_duration_on_levels_section),
-      session_duration_on_teachers_section: this.formatTime(events.session_duration_on_teachers_section),
-      session_duration_on_platform_section: this.formatTime(events.session_duration_on_platform_section),
-      session_duration_on_advisors_section: this.formatTime(events.session_duration_on_advisors_section),
-      session_duration_on_testimonials_section: this.formatTime(events.session_duration_on_testimonials_section),
-      session_duration_on_form_section: this.formatTime(events.session_duration_on_form_section),
-      session_idle_time_duration: this.formatTime(events.session_idle_time_duration)
+      payment_method_available: this.selectedPayment
     };
 
     console.log('📊 Sending session data to Zapier:', sessionData);

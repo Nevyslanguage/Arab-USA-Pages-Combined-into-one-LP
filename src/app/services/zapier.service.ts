@@ -29,15 +29,6 @@ export interface FormData {
   formSubmitted?: boolean;
   formInteractionTime?: number;
   description?: string;
-  // Session duration data (formatted as MM:SS)
-  session_duration_on_price_section?: string;
-  session_duration_on_levels_section?: string;
-  session_duration_on_teachers_section?: string;
-  session_duration_on_platform_section?: string;
-  session_duration_on_advisors_section?: string;
-  session_duration_on_testimonials_section?: string;
-  session_duration_on_form_section?: string;
-  session_idle_time_duration?: string;
 }
 
 @Injectable({
