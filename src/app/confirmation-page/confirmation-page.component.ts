@@ -719,11 +719,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           hiddenStartTime = Date.now();
           localStorage.setItem('awayStartTime', hiddenStartTime.toString());
           localStorage.setItem('awayTrackingActive', 'true');
-          console.log('📱 Mobile: Started tracking on pagehide');
+          console.log('📱 Mobile: Started tracking on pagehide - will send data when user returns if away for 90+ seconds');
           
-          // Send analytics immediately using sendBeacon for mobile, regular HTTP for desktop
-          // This ensures data is sent even if user never returns
-          this.sendAwayAnalyticsWithBeacon(90);
+          // Don't send data immediately - just start tracking
+          // Data will be sent when user returns if they were away for 90+ seconds
         }
       });
       
