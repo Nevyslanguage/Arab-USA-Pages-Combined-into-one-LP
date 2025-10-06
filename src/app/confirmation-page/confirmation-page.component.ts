@@ -1037,7 +1037,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   }
 
   // Mobile-friendly method using sendBeacon (works even when page is backgrounded)
-  private sendMobileAwayData(timeAwaySeconds: number) {
+  private async sendMobileAwayData(timeAwaySeconds: number) {
     console.log('📱 Mobile: sendMobileAwayData called - User was away for', timeAwaySeconds, 'seconds');
     
     // Check if data has already been sent for this session
@@ -1173,6 +1173,11 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
       const fullUrl = `${webhookUrl}?${params.toString()}`;
       
+      // Debug: Log the full URL and record parameter
+      console.log('📱 Mobile: Full webhook URL:', fullUrl);
+      console.log('📱 Mobile: Record parameter:', JSON.stringify(recordData));
+      console.log('📱 Mobile: Record parameter length:', JSON.stringify(recordData).length);
+      
       // Use sendBeacon for reliable delivery on mobile (works even when page is backgrounded)
       const sent = navigator.sendBeacon(fullUrl);
       
@@ -1181,6 +1186,24 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         this.sessionDataSent = true; // Mark as sent to prevent duplicates
       } else {
         console.error('❌ Mobile: sendBeacon failed to queue the request');
+        
+        // Fallback: Try using fetch with keepalive
+        console.log('🔄 Mobile: Trying fetch fallback...');
+        try {
+          const response = await fetch(fullUrl, {
+            method: 'GET',
+            keepalive: true
+          });
+          
+          if (response.ok) {
+            console.log('✅ Mobile: Fallback fetch successful');
+            this.sessionDataSent = true;
+          } else {
+            console.error('❌ Mobile: Fallback fetch failed:', response.status);
+          }
+        } catch (fallbackError) {
+          console.error('❌ Mobile: Fallback fetch error:', fallbackError);
+        }
       }
 
     } catch (error) {
