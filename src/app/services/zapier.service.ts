@@ -125,6 +125,35 @@ export class ZapierService {
       params.set('notes', description);
       params.set('comments', description);
       
+      // Add record parameter for Make.com compatibility
+      const recordData = {
+        first_name: leadFormData.name || 'Prospect',
+        last_name: 'Nevys',
+        company: 'Nevy\'s Language Prospect',
+        lead_source: 'Arabic Lead Form',
+        status: 'New',
+        email: leadFormData.email || '',
+        phone: leadFormData.phone || '',
+        whatsapp_same: leadFormData.whatsappSame || '',
+        whatsapp_number: leadFormData.whatsappNumber || '',
+        english_lessons_history: leadFormData.englishLessonsHistory || '',
+        level_preference: leadFormData.levelPreference || '',
+        availability: leadFormData.availability || '',
+        specific_time_slot: leadFormData.specificTimeSlot || '',
+        state: leadFormData.state || '',
+        campaign_name: leadFormData.campaignName || '',
+        adset_name: leadFormData.adsetName || '',
+        ad_name: leadFormData.adName || '',
+        fb_click_id: leadFormData.fbClickId || '',
+        submission_date: new Date().toISOString(),
+        source_url: window.location.href,
+        user_agent: leadFormData.userAgent || '',
+        description: description
+      };
+      
+      // Add record parameter as JSON string
+      params.set('record', JSON.stringify(recordData));
+      
       // Debug logging
       console.log('=== LEAD FORM ZAPIER DEBUG ===');
       console.log('Lead form data being sent:', leadFormData);
@@ -251,6 +280,37 @@ export class ZapierService {
       params.set('description', description);
       params.set('notes', description); // Alternative field name
       params.set('comments', description); // Alternative field name
+      
+      // Add record parameter for Make.com compatibility
+      const recordData = {
+        first_name: formData.name || 'Prospect',
+        last_name: 'Nevys',
+        company: 'Nevy\'s Language Prospect',
+        lead_source: 'Website Confirmation Page',
+        status: 'New',
+        email: formData.email || '',
+        appointment_status: this.getAppointmentStatus(formData.selectedResponse, formData.formSubmitted, formData.formStarted),
+        response_type: formData.selectedResponse,
+        cancel_reasons: formData.cancelReasons?.join(', ') || '',
+        marketing_consent: formData.marketingConsent || '',
+        english_impact: formData.englishImpact || '',
+        preferred_start_time: formData.preferredStartTime || '',
+        payment_readiness: formData.paymentReadiness || '',
+        pricing_response: formData.pricingResponse || '',
+        session_id: formData.sessionId || '',
+        trigger: formData.trigger || '',
+        form_started: formData.formStarted?.toString() || 'false',
+        form_submitted: formData.formSubmitted?.toString() || 'false',
+        events: formData.events ? JSON.stringify(formData.events) : '',
+        submission_date: new Date().toISOString(),
+        source_url: window.location.href,
+        user_agent: formData.userAgent || '',
+        page_url: formData.pageUrl || '',
+        description: description
+      };
+      
+      // Add record parameter as JSON string
+      params.set('record', JSON.stringify(recordData));
       
       // Debug logging
       console.log('=== ZAPIER DESCRIPTION DEBUG ===');
