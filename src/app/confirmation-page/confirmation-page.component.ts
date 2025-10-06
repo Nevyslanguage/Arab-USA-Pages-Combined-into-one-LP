@@ -724,8 +724,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           localStorage.setItem('awayTrackingActive', 'true');
           console.log('📱 Mobile: User leaving page - sending analytics immediately');
           
-          // Mobile: Send analytics immediately when user leaves (same format as desktop)
-          this.sendAwayAnalytics(90); // Use same method as desktop for consistency
+          // Mobile: Send analytics immediately when user leaves (no 90-second wait)
+          const actualTimeAway = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+          this.sendAwayAnalytics(actualTimeAway);
         }
       });
       
@@ -820,26 +821,27 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Mobile-specific: Add beforeunload for last-chance analytics
     window.addEventListener('beforeunload', () => {
-      if (isMobile && hiddenStartTime) {
-        const timeAway = Date.now() - hiddenStartTime;
-        const timeAwaySeconds = Math.floor(timeAway / 1000);
-        
-        console.log('📱 Mobile: beforeunload - Time away:', timeAwaySeconds, 'seconds');
-        
-        if (timeAwaySeconds >= 90) {
-          console.log('📱 Mobile: beforeunload - Sending analytics as user leaves (same format as desktop)');
-          this.sendAwayAnalytics(timeAwaySeconds);
-        } else {
-          console.log('📱 Mobile: beforeunload - Not enough time away, storing for later');
-          // Store that user left but didn't reach 90 seconds yet
-          localStorage.setItem('userLeftTime', hiddenStartTime.toString());
-          localStorage.setItem('waitingFor90Seconds', 'true');
-        }
+      if (isMobile) {
+        // Mobile: Send analytics immediately when closing page (no time threshold)
+        console.log('📱 Mobile: beforeunload - Sending analytics immediately as user closes page');
+        const actualTimeAway = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+        this.sendAwayAnalytics(actualTimeAway);
       } else if (!isMobile) {
-        // Desktop: Send session data if not already sent
+        // Desktop: Keep existing logic (90-second threshold)
         if (!this.sessionDataSent) {
           console.log('🖥️ Desktop: beforeunload - Sending session data as user leaves');
           this.sendDataForSession('user_closed_page');
+        }
+        
+        // Calculate time away from page load time for desktop
+        const pageLoadTime = localStorage.getItem('nevys_page_load_time');
+        if (pageLoadTime) {
+          const timeAwaySeconds = Math.floor((Date.now() - parseInt(pageLoadTime)) / 1000);
+          // Use same method as desktop for consistency
+          this.sendAwayAnalytics(timeAwaySeconds);
+        } else {
+          // Fallback to 90 seconds if no page load time
+          this.sendAwayAnalytics(90);
         }
       }
     });
