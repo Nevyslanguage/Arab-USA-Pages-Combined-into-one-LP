@@ -31,14 +31,98 @@ export interface FormData {
   description?: string;
 }
 
+export interface LeadFormData {
+  // Lead form specific fields
+  englishLessonsHistory: string;
+  levelPreference: string;
+  availability: string;
+  specificTimeSlot: string;
+  name: string;
+  phone: string;
+  whatsappSame: string;
+  whatsappNumber?: string;
+  email: string;
+  state: string;
+  campaignName?: string;
+  adsetName?: string;
+  adName?: string;
+  fbClickId?: string;
+  // Additional metadata
+  submissionDate?: string;
+  sourceUrl?: string;
+  userAgent?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class ZapierService {
-  // Your actual Zapier webhook URL - UPDATE THIS WITH YOUR NEW WEBHOOK URL
-  private readonly ZAPIER_WEBHOOK_URL = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
+  // Webhook URLs for different purposes
+  private readonly LEAD_FORM_WEBHOOK_URL = 'https://hook.us1.make.com/bsfdoly1dekmske3r620ydu5p3d3hnor';
+  private readonly CONFIRMATION_WEBHOOK_URL = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
 
   constructor(private http: HttpClient) {}
+
+  // Send lead form data to Zapier webhook
+  async sendLeadFormToZapier(leadFormData: LeadFormData): Promise<any> {
+    try {
+      // Create URL parameters for the webhook
+      const params = new URLSearchParams();
+      
+      // Basic lead information
+      params.set('first_name', leadFormData.name || 'Prospect');
+      params.set('last_name', 'Nevys');
+      params.set('company', 'Nevy\'s Language Prospect');
+      params.set('lead_source', 'Arabic Lead Form');
+      params.set('status', 'New');
+      params.set('email', leadFormData.email || '');
+      
+      // Lead form specific fields
+      params.set('english_lessons_history', leadFormData.englishLessonsHistory || '');
+      params.set('level_preference', leadFormData.levelPreference || '');
+      params.set('availability', leadFormData.availability || '');
+      params.set('specific_time_slot', leadFormData.specificTimeSlot || '');
+      params.set('phone', leadFormData.phone || '');
+      params.set('whatsapp_same', leadFormData.whatsappSame || '');
+      
+      if (leadFormData.whatsappSame === 'no' && leadFormData.whatsappNumber) {
+        params.set('whatsapp_number', leadFormData.whatsappNumber);
+      }
+      
+      params.set('state', leadFormData.state || '');
+      
+      // Campaign tracking data
+      if (leadFormData.campaignName) params.set('campaign_name', leadFormData.campaignName);
+      if (leadFormData.adsetName) params.set('adset_name', leadFormData.adsetName);
+      if (leadFormData.adName) params.set('ad_name', leadFormData.adName);
+      if (leadFormData.fbClickId) params.set('fb_click_id', leadFormData.fbClickId);
+      
+      // Additional metadata
+      params.set('submission_date', new Date().toISOString());
+      params.set('source_url', window.location.href);
+      if (leadFormData.userAgent) params.set('user_agent', leadFormData.userAgent);
+      
+      // Formatted description for Salesforce
+      const description = this.formatLeadFormDataForDescription(leadFormData);
+      params.set('description', description);
+      params.set('notes', description);
+      params.set('comments', description);
+      
+      // Debug logging
+      console.log('=== LEAD FORM ZAPIER DEBUG ===');
+      console.log('Lead form data being sent:', leadFormData);
+      console.log('Description being sent:', description);
+      console.log('Full URL being sent:', `${this.LEAD_FORM_WEBHOOK_URL}?${params.toString()}`);
+      console.log('All parameters being sent:', params.toString());
+
+      // Send as GET request with query parameters
+      const response = await this.http.get(`${this.LEAD_FORM_WEBHOOK_URL}?${params.toString()}`).toPromise();
+      return response;
+    } catch (error) {
+      console.error('Error sending lead form to Zapier:', error);
+      throw error;
+    }
+  }
 
   // Send form data to Zapier webhook
   async sendToZapier(formData: FormData): Promise<any> {
@@ -121,16 +205,49 @@ export class ZapierService {
       console.log('=== ZAPIER DESCRIPTION DEBUG ===');
       console.log('Description being sent:', description);
       console.log('Description length:', description.length);
-      console.log('Full URL being sent:', `${this.ZAPIER_WEBHOOK_URL}?${params.toString()}`);
+      console.log('Full URL being sent:', `${this.CONFIRMATION_WEBHOOK_URL}?${params.toString()}`);
       console.log('🔍 DEBUG - All parameters being sent:', params.toString());
 
       // Send as GET request with query parameters
-      const response = await this.http.get(`${this.ZAPIER_WEBHOOK_URL}?${params.toString()}`).toPromise();
+      const response = await this.http.get(`${this.CONFIRMATION_WEBHOOK_URL}?${params.toString()}`).toPromise();
       return response;
     } catch (error) {
       console.error('Error sending to Zapier:', error);
       throw error;
     }
+  }
+
+  // Format lead form data into a readable description
+  private formatLeadFormDataForDescription(leadFormData: LeadFormData): string {
+    let description = `Arabic Lead Form Submission Details:\n\n`;
+    
+    description += `Name: ${leadFormData.name || 'Not provided'}\n`;
+    description += `Email: ${leadFormData.email || 'Not provided'}\n`;
+    description += `Phone: ${leadFormData.phone || 'Not provided'}\n`;
+    description += `WhatsApp Same: ${leadFormData.whatsappSame || 'Not provided'}\n`;
+    
+    if (leadFormData.whatsappSame === 'no' && leadFormData.whatsappNumber) {
+      description += `WhatsApp Number: ${leadFormData.whatsappNumber}\n`;
+    }
+    
+    description += `English Lessons History: ${leadFormData.englishLessonsHistory || 'Not provided'}\n`;
+    description += `Level Preference: ${leadFormData.levelPreference || 'Not provided'}\n`;
+    description += `Best Time to Contact: ${leadFormData.availability || 'Not provided'}\n`;
+    description += `Detailed Contact Time: ${leadFormData.specificTimeSlot || 'Not provided'}\n`;
+    description += `State: ${leadFormData.state || 'Not provided'}\n`;
+    
+    // Facebook campaign data
+    if (leadFormData.campaignName) {
+      description += `\nFacebook Campaign Data:\n`;
+      description += `Campaign: ${leadFormData.campaignName}\n`;
+      description += `Adset: ${leadFormData.adsetName || 'Not provided'}\n`;
+      description += `Ad: ${leadFormData.adName || 'Not provided'}\n`;
+      description += `Click ID: ${leadFormData.fbClickId || 'Not provided'}\n`;
+    }
+    
+    description += `\nSubmitted on: ${new Date().toLocaleString()}`;
+    
+    return description;
   }
 
   // Format form data into a readable

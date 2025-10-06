@@ -875,7 +875,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // This is just for logging - no data is sent to Zapier
   }
 
-  private sendAwayAnalytics(timeAwaySeconds: number) {
+  private async sendAwayAnalytics(timeAwaySeconds: number) {
     console.log('🚀 sendAwayAnalytics called - User was away for', timeAwaySeconds, 'seconds (90+ second threshold)');
     
     // Calculate form interaction time
@@ -923,55 +923,44 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
-    
-    // Prepare URL parameters (matching your existing pattern)
-    const params = new URLSearchParams();
-    params.set('trigger', 'user_away_for_60_plus_seconds');
-    params.set('sessionId', this.sessionId);
-    params.set('timestamp', new Date().toISOString());
-    params.set('name', this.urlParams.name || '');
-    params.set('email', this.urlParams.email || '');
-    params.set('campaignName', this.urlParams.campaignName || '');
-    params.set('adsetName', this.urlParams.adsetName || '');
-    params.set('adName', this.urlParams.adName || '');
-    params.set('fbClickId', this.urlParams.fbClickId || '');
-    params.set('userAgent', navigator.userAgent);
-    params.set('pageUrl', window.location.href);
-    params.set('totalSessionTime', Math.floor((Date.now() - this.sessionStartTime) / 1000).toString());
-    params.set('timeAwaySeconds', timeAwaySeconds.toString());
-    
-    // Add events data as JSON string (matching your existing pattern)
-    params.set('events', JSON.stringify(events));
-    
-    // Add formatted description (matching your existing pattern)
-    const description = this.formatAwayAnalyticsDescription(events, timeAwaySeconds);
-    params.set('description', description);
-    params.set('notes', description); // Alternative field name
-    params.set('comments', description); // Alternative field name
-    
-    const fullUrl = `${webhookUrl}?${params.toString()}`;
-    
-    console.log('📡 Sending away analytics to Zapier:', fullUrl);
-    console.log('📊 Full data being sent:', {
-      trigger: 'user_away_for_60_plus_seconds',
-      sessionId: this.sessionId,
+    // Prepare data for ZapierService
+    const formData: FormData = {
+      selectedResponse: 'User Away',
+      cancelReasons: [],
+      otherReason: '',
+      marketingConsent: '',
+      englishImpact: 'Not Applicable',
+      preferredStartTime: '',
+      paymentReadiness: '',
+      pricingResponse: '',
       name: this.urlParams.name || '',
       email: this.urlParams.email || '',
+      campaignName: this.urlParams.campaignName || '',
+      adsetName: this.urlParams.adsetName || '',
+      adName: this.urlParams.adName || '',
+      fbClickId: this.urlParams.fbClickId || '',
+      sessionId: this.sessionId,
+      trigger: 'user_away_for_60_plus_seconds',
+      timestamp: new Date().toISOString(),
       totalSessionTime: Math.floor((Date.now() - this.sessionStartTime) / 1000),
-      timeAwaySeconds: timeAwaySeconds,
-      events: events
-    });
+      events: events,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      formInteractionTime: formInteractionTime,
+      description: this.formatAwayAnalyticsDescription(events, timeAwaySeconds)
+    };
+
+    console.log('📡 Sending away analytics via ZapierService:', formData);
 
     try {
-      // --- ✅ Use the EXACT same method as confirm/cancel actions ---
-      console.log('ℹ️ Using sendTrackingData method (same as confirm/cancel)');
-      
-      // Send data for session (only once per session)
-      this.sendDataForSession('user_away_90_seconds');
+      // Send using ZapierService
+      await this.zapierService.sendToZapier(formData);
+      console.log('✅ Away analytics successfully sent via ZapierService');
 
     } catch (error) {
-      console.error('❌ Error sending away analytics:', error);
+      console.error('❌ Error sending away analytics via ZapierService:', error);
     }
   }
 
@@ -1220,60 +1209,50 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Keep the old method for backward compatibility with tracking data
-  private sendToZapier(data: any) {
-    // In development mode, just log the data without making API calls
-    if (this.isDevelopment) {
-      console.log('🔧 Development mode (localhost): Logging analytics data (no Zapier API call)');
-      console.log('📊 Analytics data that would be sent:');
-      console.log(JSON.stringify(data, null, 2));
-      return;
+  // Send data using ZapierService (confirmation page data)
+  private async sendToZapier(data: any) {
+    try {
+      // Convert data to FormData format for ZapierService
+      const formData: FormData = {
+        selectedResponse: data.confirmation_choice || data.selected_choice || 'No response',
+        cancelReasons: data.cancellation_reasons || [],
+        otherReason: data.other_reason || '',
+        marketingConsent: data.subscription_preference || '',
+        englishImpact: 'Not Applicable',
+        preferredStartTime: data.preferred_start_time || '',
+        paymentReadiness: data.payment_access || '',
+        pricingResponse: '',
+        name: data.lead_name || data.name || '',
+        email: data.lead_email || data.email || '',
+        campaignName: data.campaign_name || '',
+        adsetName: data.adset_name || '',
+        adName: data.ad_name || '',
+        fbClickId: data.fb_click_id || '',
+        sessionId: data.session_id || '',
+        trigger: data.trigger || '',
+        timestamp: data.timestamp || new Date().toISOString(),
+        totalSessionTime: data.total_session_time || 0,
+        events: data.events || {},
+        userAgent: data.user_agent || navigator.userAgent,
+        pageUrl: data.page_url || window.location.href,
+        formStarted: data.form_started || false,
+        formSubmitted: data.form_submitted || false,
+        formInteractionTime: data.form_interaction_time || 0,
+        description: data.description || ''
+      };
+
+      console.log('📤 Sending confirmation data via ZapierService:', formData);
+      
+      // Send using ZapierService
+      await this.zapierService.sendToZapier(formData);
+      
+      console.log('✅ Confirmation data successfully sent via ZapierService');
+      
+    } catch (error) {
+      console.error('❌ Error sending confirmation data via ZapierService:', error);
     }
-    
-    // Use the webhook URL from the service
-    const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
-    
-    // Log the data being sent for debugging
-    console.log('📤 Attempting to send data to Zapier:', data);
-    
-    // Send data to Zapier webhook
-    this.sendToZapierWebhook(webhookUrl, data);
   }
 
-  private sendToZapierWebhook(webhookUrl: string, data: any) {
-    console.log('🔗 Sending to webhook URL:', webhookUrl);
-    
-    // Send data to Zapier webhook as GET with query parameters (CORS-friendly)
-    const params = new URLSearchParams();
-    Object.keys(data).forEach(key => {
-      if (data[key] !== null && data[key] !== undefined) {
-        if (typeof data[key] === 'object') {
-          params.set(key, JSON.stringify(data[key]));
-        } else {
-          params.set(key, data[key].toString());
-        }
-      }
-    });
-    
-    fetch(`${webhookUrl}?${params.toString()}`, {
-      method: 'GET',
-      mode: 'cors'
-    })
-    .then(response => {
-      if (response.ok) {
-        console.log('✅ Successfully sent to Zapier:', data);
-        console.log('📊 Data sent as query parameters:', params.toString());
-        console.log('🔗 Webhook URL used:', webhookUrl);
-        console.log('📋 Response status:', response.status);
-        console.log('📋 Response headers:', response.headers);
-      } else {
-        console.error('❌ Failed to send to Zapier:', response.status, response.statusText);
-      }
-    })
-    .catch(error => {
-      console.error('❌ Error sending to Zapier:', error);
-    });
-  }
 
   // Centralized method to send data for session (only once per session)
   private sendDataForSession(scenario: string) {
@@ -1623,99 +1602,17 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private sendToZapierWithBeacon(formData: any) {
+  private async sendToZapierWithBeacon(formData: any) {
     try {
-      // Create URL parameters for the webhook
-      const params = new URLSearchParams();
+      console.log('📡 Using sendBeacon for reliable data transmission via ZapierService');
       
-      // Basic lead information
-      params.set('first_name', formData.name || 'Prospect');
-      params.set('last_name', 'Nevys');
-      params.set('company', 'Nevy\'s Language Prospect');
-      params.set('lead_source', 'Website Confirmation Page');
-      params.set('status', 'New');
+      // Use ZapierService for consistent data handling
+      await this.zapierService.sendToZapier(formData);
       
-      // Appointment status based on user response
-      const appointmentStatus = this.getAppointmentStatus(formData.selectedResponse, formData.formSubmitted, formData.formStarted);
-      params.set('appointment_status', appointmentStatus);
-      
-      // Form responses
-      params.set('response_type', formData.selectedResponse);
-      
-      if (formData.cancelReasons && formData.cancelReasons.length > 0) {
-        params.set('cancel_reasons', formData.cancelReasons.join(', '));
-      } else {
-        params.set('cancel_reasons', '');
-      }
-      
-      if (formData.otherReason) {
-        params.set('other_reason', formData.otherReason);
-      }
-      params.set('marketing_consent', formData.marketingConsent);
-      params.set('english_impact', formData.englishImpact);
-      params.set('preferred_start_time', formData.preferredStartTime);
-      params.set('payment_readiness', formData.paymentReadiness);
-      
-      // Campaign tracking data
-      if (formData.email) params.set('email', formData.email);
-      if (formData.campaignName) params.set('campaign_name', formData.campaignName);
-      if (formData.adsetName) params.set('adset_name', formData.adsetName);
-      if (formData.adName) params.set('ad_name', formData.adName);
-      if (formData.fbClickId) params.set('fb_click_id', formData.fbClickId);
-      
-      // Analytics data
-      if (formData.sessionId) params.set('session_id', formData.sessionId);
-      if (formData.trigger) params.set('trigger', formData.trigger);
-      if (formData.totalSessionTime) params.set('total_session_time', formData.totalSessionTime.toString());
-      if (formData.formStarted !== undefined) params.set('form_started', formData.formStarted.toString());
-      if (formData.formSubmitted !== undefined) params.set('form_submitted', formData.formSubmitted.toString());
-      if (formData.formInteractionTime) params.set('form_interaction_time', formData.formInteractionTime.toString());
-      
-      // Events data (convert to JSON string for URL parameter)
-      if (formData.events) {
-        params.set('events', JSON.stringify(formData.events));
-      }
-      
-      // Additional metadata
-      params.set('submission_date', new Date().toISOString());
-      params.set('source_url', window.location.href);
-      if (formData.userAgent) params.set('user_agent', formData.userAgent);
-      if (formData.pageUrl) params.set('page_url', formData.pageUrl);
-      
-      // Formatted description for Salesforce
-      const description = formData.description || this.formatFormDataForDescription(formData);
-      params.set('description', description);
-      params.set('notes', description);
-      params.set('comments', description);
-      
-      const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
-      const fullUrl = `${webhookUrl}?${params.toString()}`;
-      
-      console.log('📡 Using sendBeacon for reliable data transmission:', fullUrl);
-      
-      // Use sendBeacon for reliable transmission during page unload
-      const success = navigator.sendBeacon(fullUrl);
-      
-      if (success) {
-        console.log('✅ Data sent successfully via sendBeacon');
-      } else {
-        console.warn('⚠️ sendBeacon failed, trying fallback method');
-        // Fallback to regular fetch
-        fetch(fullUrl, { method: 'GET', keepalive: true })
-          .then(response => {
-            if (response.ok) {
-              console.log('✅ Fallback method succeeded');
-            } else {
-              console.error('❌ Fallback method failed:', response.status);
-            }
-          })
-          .catch(error => {
-            console.error('❌ Fallback method error:', error);
-          });
-      }
+      console.log('✅ Data sent successfully via ZapierService with sendBeacon');
       
     } catch (error) {
-      console.error('❌ Error in sendToZapierWithBeacon:', error);
+      console.error('❌ Error in sendToZapierWithBeacon via ZapierService:', error);
     }
   }
 

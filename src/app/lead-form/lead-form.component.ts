@@ -5,6 +5,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { COUNTRIES, Country } from '.././countries';
 import { getMaxDigitsForCountry } from '.././country-digit-limits';
+import { ZapierService, LeadFormData } from '../services/zapier.service';
 
 @Component({
   selector: 'app-lead-form',
@@ -124,7 +125,7 @@ export class LeadFormComponent implements OnInit {
     ]
   };
 
-  constructor(private fb: FormBuilder, private http: HttpClient, private router: Router) {
+  constructor(private fb: FormBuilder, private http: HttpClient, private router: Router, private zapierService: ZapierService) {
     this.leadForm = this.fb.group({
       englishLessonsHistory: ['', Validators.required],
       levelPreference: ['', Validators.required],
@@ -239,9 +240,46 @@ export class LeadFormComponent implements OnInit {
     });
   }
 
-  sendToZapier(formData: any) {
-    // Navigate directly to confirmation page
-    this.navigateToConfirmation(formData);
+  async sendToZapier(formData: any) {
+    try {
+      // Prepare lead form data for ZapierService
+      const leadFormData: LeadFormData = {
+        englishLessonsHistory: formData.englishLessonsHistory || '',
+        levelPreference: formData.levelPreference || '',
+        availability: formData.availability || '',
+        specificTimeSlot: formData.specificTimeSlot || '',
+        name: formData.name || '',
+        phone: formData.phone || '',
+        whatsappSame: formData.whatsappSame || '',
+        whatsappNumber: formData.whatsappSame === 'no' ? formData.whatsappNumber : undefined,
+        email: formData.email || '',
+        state: formData.state || '',
+        campaignName: formData.campaignName || '',
+        adsetName: formData.adsetName || '',
+        adName: formData.adName || '',
+        fbClickId: formData.fbClickId || '',
+        submissionDate: new Date().toISOString(),
+        sourceUrl: window.location.href,
+        userAgent: navigator.userAgent
+      };
+
+      console.log('Sending lead form data via ZapierService:', leadFormData);
+      
+      // Send to Zapier webhook using ZapierService
+      await this.zapierService.sendLeadFormToZapier(leadFormData);
+      
+      console.log('Lead form data successfully sent to webhook');
+      
+      // Navigate to confirmation page after successful submission
+      this.navigateToConfirmation(formData);
+      
+    } catch (error) {
+      console.error('Error sending lead form to webhook:', error);
+      
+      // Still navigate to confirmation page even if webhook fails
+      // This ensures the user experience isn't broken
+      this.navigateToConfirmation(formData);
+    }
   }
 
   // Navigate to confirmation page with parameters
@@ -266,7 +304,7 @@ export class LeadFormComponent implements OnInit {
     document.body.style.overflow = 'auto';
   }
 
-  confirmSubmission() {
+  async confirmSubmission() {
     // Get form values
     const formData = this.leadForm.value;
     
@@ -274,13 +312,14 @@ export class LeadFormComponent implements OnInit {
     this.closeVerificationPage();
     
     // Send data to Zapier webhook
-    this.sendToZapier(formData);
+    await this.sendToZapier(formData);
   }
 
   editForm() {
     // Close verification page and allow editing
     this.closeVerificationPage();
   }
+
 
   // Format form data into a readable description (matching successful pattern)
   private formatFormDataForDescription(formData: any): string {
