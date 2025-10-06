@@ -726,7 +726,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           
           // Mobile: Send analytics immediately when user leaves (no 90-second wait)
           const actualTimeAway = Math.floor((Date.now() - this.sessionStartTime) / 1000);
-          this.sendAwayAnalytics(actualTimeAway);
+          this.sendMobileAwayData(actualTimeAway);
         }
       });
       
@@ -825,7 +825,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         // Mobile: Send analytics immediately when closing page (no time threshold)
         console.log('📱 Mobile: beforeunload - Sending analytics immediately as user closes page');
         const actualTimeAway = Math.floor((Date.now() - this.sessionStartTime) / 1000);
-        this.sendAwayAnalytics(actualTimeAway);
+        this.sendMobileAwayData(actualTimeAway);
       } else if (!isMobile) {
         // Desktop: Keep existing logic (90-second threshold)
         if (!this.sessionDataSent) {
@@ -1177,6 +1177,37 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       params.set('description', formData.description || '');
       params.set('notes', formData.description || '');
       params.set('comments', formData.description || '');
+      
+      // Add record parameter for Make.com compatibility
+      const recordData = {
+        first_name: formData.name || 'Prospect',
+        last_name: 'Nevys',
+        company: 'Nevy\'s Language Prospect',
+        lead_source: 'Website Confirmation Page',
+        status: 'New',
+        email: formData.email || '',
+        appointment_status: appointmentStatus,
+        response_type: formData.selectedResponse,
+        cancel_reasons: formData.cancelReasons?.join(', ') || '',
+        marketing_consent: formData.marketingConsent || '',
+        english_impact: formData.englishImpact || '',
+        preferred_start_time: formData.preferredStartTime || '',
+        payment_readiness: formData.paymentReadiness || '',
+        pricing_response: formData.pricingResponse || '',
+        session_id: formData.sessionId || '',
+        trigger: formData.trigger || '',
+        form_started: formData.formStarted?.toString() || 'false',
+        form_submitted: formData.formSubmitted?.toString() || 'false',
+        events: formData.events ? JSON.stringify(formData.events) : '',
+        submission_date: new Date().toISOString(),
+        source_url: window.location.href,
+        user_agent: formData.userAgent || '',
+        page_url: formData.pageUrl || '',
+        description: formData.description || ''
+      };
+      
+      // Add record parameter as JSON string
+      params.set('record', JSON.stringify(recordData));
 
       const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
       const fullUrl = `${webhookUrl}?${params.toString()}`;
