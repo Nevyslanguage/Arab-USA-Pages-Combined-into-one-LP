@@ -2503,13 +2503,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   private showThanksMessage(isCancellation: boolean = false) {
     console.log('🔍 showThanksMessage - isCancellation:', isCancellation, 'selectedChoice:', this.selectedChoice);
     
-    // Send data for session (only once per session)
-    this.sendDataForSession('user_cancelled');
-    
     // Check if this is a cancellation to show success page
     if (isCancellation || this.selectedChoice === 'cancel') {
       console.log('🎯 Showing cancellation success page');
       this.showCancellationSuccess = true;
+      // Send data for session after showing cancellation success
+      this.sendDataForSession('user_cancelled');
       // Don't reset form values here - let closeCancellationSuccess() handle it when modal is closed
     } else {
       console.log('🎯 Showing regular thanks modal');
@@ -2517,6 +2516,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       this.showThanksModal = true;
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
+      // Send data for session
+      this.sendDataForSession('user_confirmed');
       // Reset form values after showing thanks message
       this.resetFormValues();
     }
