@@ -722,12 +722,18 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           hiddenStartTime = Date.now();
           localStorage.setItem('awayStartTime', hiddenStartTime.toString());
           localStorage.setItem('awayTrackingActive', 'true');
-          console.log('📱 Mobile: Started tracking on pagehide');
+          console.log('📱 Mobile: Started tracking on pagehide - will send data after 90 seconds');
           
-          // Mobile-friendly: Send data immediately using sendBeacon (works even when page is backgrounded)
-          // This ensures data is sent even if user never returns
-          console.log('📱 Mobile: Sending data immediately using sendBeacon for reliability');
-          this.sendMobileAwayData(90); // Send with 90 seconds as default
+          // Mobile-friendly: Set up 90-second delay using setTimeout
+          // This ensures data is sent 90 seconds after user leaves
+          setTimeout(() => {
+            console.log('📱 Mobile: 90 seconds elapsed since user left - sending data via sendBeacon');
+            this.sendMobileAwayData(90);
+          }, 90000); // 90 seconds delay
+          
+          // Fallback: Also store a flag for recovery in case setTimeout doesn't work
+          localStorage.setItem('mobileAwayStartTime', hiddenStartTime.toString());
+          localStorage.setItem('mobileWaitingFor90Seconds', 'true');
         }
       });
       
@@ -895,6 +901,28 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         // Clear the data
         localStorage.removeItem('awayStartTime');
         localStorage.removeItem('awayTrackingActive');
+      }
+      
+      // Check for mobile-specific 90-second delay tracking
+      const mobileAwayStartTime = localStorage.getItem('mobileAwayStartTime');
+      const mobileWaitingFor90Seconds = localStorage.getItem('mobileWaitingFor90Seconds');
+      
+      if (mobileAwayStartTime && mobileWaitingFor90Seconds === 'true') {
+        const timeAway = Date.now() - parseInt(mobileAwayStartTime);
+        const timeAwaySeconds = Math.floor(timeAway / 1000);
+        
+        console.log('📱 Mobile: Found mobile 90-second delay tracking - User was away for', timeAwaySeconds, 'seconds');
+        
+        if (timeAwaySeconds >= 90) {
+          console.log('🚨 Mobile: Mobile delay tracking - User was away for 90+ seconds - Sending analytics!');
+          this.sendMobileAwayData(timeAwaySeconds);
+        } else {
+          console.log('📱 Mobile: User returned before 90 seconds - No analytics sent');
+        }
+        
+        // Clear the data
+        localStorage.removeItem('mobileAwayStartTime');
+        localStorage.removeItem('mobileWaitingFor90Seconds');
       }
       
       
