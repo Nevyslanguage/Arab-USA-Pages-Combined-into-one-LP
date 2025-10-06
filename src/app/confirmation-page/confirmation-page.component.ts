@@ -722,18 +722,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           hiddenStartTime = Date.now();
           localStorage.setItem('awayStartTime', hiddenStartTime.toString());
           localStorage.setItem('awayTrackingActive', 'true');
-          console.log('📱 Mobile: Started tracking on pagehide - will send data after 90 seconds');
+          console.log('📱 Mobile: User leaving page - sending analytics immediately');
           
-          // Mobile-friendly: Set up 90-second delay using setTimeout
-          // This ensures data is sent 90 seconds after user leaves
-          setTimeout(() => {
-            console.log('📱 Mobile: 90 seconds elapsed since user left - sending data via sendBeacon');
-            this.sendMobileAwayData(90);
-          }, 90000); // 90 seconds delay
-          
-          // Fallback: Also store a flag for recovery in case setTimeout doesn't work
-          localStorage.setItem('mobileAwayStartTime', hiddenStartTime.toString());
-          localStorage.setItem('mobileWaitingFor90Seconds', 'true');
+          // Mobile: Send analytics immediately when user leaves (same format as desktop)
+          this.sendAwayAnalytics(90); // Use same method as desktop for consistency
         }
       });
       
@@ -835,8 +827,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         console.log('📱 Mobile: beforeunload - Time away:', timeAwaySeconds, 'seconds');
         
         if (timeAwaySeconds >= 90) {
-          console.log('📱 Mobile: beforeunload - Sending analytics as user leaves using sendBeacon');
-          this.sendMobileAwayData(timeAwaySeconds);
+          console.log('📱 Mobile: beforeunload - Sending analytics as user leaves (same format as desktop)');
+          this.sendAwayAnalytics(timeAwaySeconds);
         } else {
           console.log('📱 Mobile: beforeunload - Not enough time away, storing for later');
           // Store that user left but didn't reach 90 seconds yet
@@ -895,7 +887,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         
         if (timeAwaySeconds >= 90) {
           console.log('🚨 Mobile: Main tracking - User was away for 90+ seconds - Sending analytics!');
-          this.sendMobileAwayData(timeAwaySeconds);
+          this.sendAwayAnalytics(timeAwaySeconds);
         }
         
         // Clear the data
@@ -915,7 +907,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         
         if (timeAwaySeconds >= 90) {
           console.log('🚨 Mobile: Mobile delay tracking - User was away for 90+ seconds - Sending analytics!');
-          this.sendMobileAwayData(timeAwaySeconds);
+          this.sendAwayAnalytics(timeAwaySeconds);
         } else {
           console.log('📱 Mobile: User returned before 90 seconds - No analytics sent');
         }
@@ -1935,10 +1927,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.log('📤 Sending to ZapierService with formatted description:', formData);
       console.log('🔍 Cancel reasons being sent:', formData.cancelReasons);
       
-      // Check if this is a page unload scenario and use sendBeacon for mobile, regular HTTP for desktop
+      // Check if this is a page unload scenario - use regular ZapierService for all devices
       if (zapierData.trigger === 'page_unload' || zapierData.trigger === 'page_hidden') {
-        console.log('🚪 Page unloading - using sendBeacon for mobile, regular HTTP for desktop');
-        this.sendToZapierWithBeacon(formData);
+        console.log('🚪 Page unloading - using regular ZapierService for all devices');
+        // Use ZapierService directly (same as desktop)
+        const response = await this.zapierService.sendToZapier(formData);
+        console.log('✅ Successfully sent to Zapier via ZapierService:', response);
         return;
       }
       
@@ -1954,32 +1948,6 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async sendToZapierWithBeacon(formData: any) {
-    try {
-      // Check if this is a mobile device
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      console.log('📱 Mobile device detected for sendToZapierWithBeacon:', isMobile);
-      
-      if (isMobile) {
-        console.log('📱 Mobile device - using sendBeacon for reliable data transmission via ZapierService');
-      
-      // Use ZapierService for consistent data handling
-      await this.zapierService.sendToZapier(formData);
-      
-        console.log('✅ Data sent successfully via ZapierService with sendBeacon (mobile)');
-      } else {
-        console.log('🖥️ Desktop browser - using regular HTTP request instead of sendBeacon');
-        
-        // Use ZapierService for consistent data handling (regular HTTP request)
-        await this.zapierService.sendToZapier(formData);
-        
-        console.log('✅ Data sent successfully via ZapierService (desktop)');
-      }
-      
-    } catch (error) {
-      console.error('❌ Error in sendToZapierWithBeacon via ZapierService:', error);
-    }
-  }
 
   // Note: getAppointmentStatus logic is handled by ZapierService
   // This ensures consistent appointment status calculation across the app
