@@ -19,10 +19,14 @@ export class LeadFormComponent implements OnInit {
   title = 'arableadform';
   leadForm: FormGroup;
   selectedTimeSlots: any[] = [];
-  selectedCountryCode = '+963';
+  selectedCountryCode = '+1';
+  selectedWhatsAppCountryCode = '+963';
   showCountryDropdown = false;
+  showWhatsAppCountryDropdown = false;
   countrySearchTerm = '';
+  whatsappCountrySearchTerm = '';
   filteredCountries: any[] = [];
+  filteredWhatsAppCountries: any[] = [];
 
   // State dropdown properties
   showStateDropdown = false;
@@ -161,7 +165,7 @@ export class LeadFormComponent implements OnInit {
   ngOnInit() {
     this.extractUrlParameters();
     // Ensure the country code display is properly initialized
-    this.selectedCountryCode = '+963'; // Default to Syria
+    this.selectedCountryCode = '+1'; // Default to US/Canada
   }
 
   extractUrlParameters() {
@@ -472,16 +476,16 @@ export class LeadFormComponent implements OnInit {
   formatWhatsAppNumber(event: any) {
     let value = event.target.value.replace(/\D/g, '');
     
-    // Get the maximum allowed digits for the selected country
-    const maxDigits = this.getMaxDigitsForCountry(this.selectedCountryCode);
+    // Get the maximum allowed digits for the selected WhatsApp country
+    const maxDigits = this.getMaxDigitsForCountry(this.selectedWhatsAppCountryCode);
     
     // Limit to the maximum allowed digits for the selected country
     if (value.length > maxDigits) {
       value = value.substring(0, maxDigits);
     }
     
-    // Format based on country code
-    value = this.formatNumberByCountry(value, this.selectedCountryCode);
+    // Format based on WhatsApp country code
+    value = this.formatNumberByCountry(value, this.selectedWhatsAppCountryCode);
     
     this.leadForm.get('whatsappNumber')?.setValue(value, { emitEvent: false });
   }
@@ -568,14 +572,14 @@ export class LeadFormComponent implements OnInit {
 
   // Get full WhatsApp number with country code
   getFullWhatsAppNumber(): string {
-    const countryCode = this.selectedCountryCode;
+    const countryCode = this.selectedWhatsAppCountryCode;
     const number = this.leadForm.get('whatsappNumber')?.value || '';
     return countryCode + ' ' + number;
   }
 
   // Get formatted WhatsApp number for display
   getFormattedWhatsAppDisplay(): string {
-    const countryCode = this.selectedCountryCode;
+    const countryCode = this.selectedWhatsAppCountryCode;
     const number = this.leadForm.get('whatsappNumber')?.value || '';
     if (!number) {
       return 'رقم الهاتف';
@@ -619,6 +623,12 @@ export class LeadFormComponent implements OnInit {
   // Get the flag for the selected country code
   getSelectedCountryFlag(): string {
     const selectedCountry = this.countryCodes.find(country => country.code === this.selectedCountryCode);
+    return selectedCountry ? selectedCountry.flag : '🇺🇸';
+  }
+
+  // Get the flag for the selected WhatsApp country code
+  getSelectedWhatsAppCountryFlag(): string {
+    const selectedCountry = this.countryCodes.find(country => country.code === this.selectedWhatsAppCountryCode);
     return selectedCountry ? selectedCountry.flag : '🇸🇾';
   }
 
@@ -630,6 +640,16 @@ export class LeadFormComponent implements OnInit {
       this.countrySearchTerm = '';
     }
     console.log('Dropdown toggled, showCountryDropdown:', this.showCountryDropdown);
+  }
+
+  // Toggle WhatsApp country dropdown
+  toggleWhatsAppCountryDropdown() {
+    this.showWhatsAppCountryDropdown = !this.showWhatsAppCountryDropdown;
+    if (this.showWhatsAppCountryDropdown) {
+      this.filteredWhatsAppCountries = [...this.countryCodes];
+      this.whatsappCountrySearchTerm = '';
+    }
+    console.log('WhatsApp dropdown toggled, showWhatsAppCountryDropdown:', this.showWhatsAppCountryDropdown);
   }
 
   // Select a country
@@ -651,6 +671,27 @@ export class LeadFormComponent implements OnInit {
     }
     
     console.log('Country selected:', country);
+  }
+
+  // Select a WhatsApp country
+  selectWhatsAppCountry(country: any) {
+    this.selectedWhatsAppCountryCode = country.code;
+    this.showWhatsAppCountryDropdown = false;
+    this.whatsappCountrySearchTerm = '';
+    
+    // Re-format WhatsApp number if it exists and exceeds the new country's limit
+    const currentWhatsAppNumber = this.leadForm.get('whatsappNumber')?.value || '';
+    if (currentWhatsAppNumber) {
+      const digits = currentWhatsAppNumber.replace(/\D/g, '');
+      const maxDigits = this.getMaxDigitsForCountry(country.code);
+      
+      if (digits.length > maxDigits) {
+        const trimmedDigits = digits.substring(0, maxDigits);
+        this.leadForm.get('whatsappNumber')?.setValue(trimmedDigits, { emitEvent: false });
+      }
+    }
+    
+    console.log('WhatsApp country selected:', country);
   }
 
   // Filter countries based on search term - optimized for speed
@@ -683,6 +724,38 @@ export class LeadFormComponent implements OnInit {
   onSearchClear() {
     this.countrySearchTerm = '';
     this.filterCountries();
+  }
+
+  // Filter WhatsApp countries based on search term
+  filterWhatsAppCountries() {
+    const searchTerm = this.whatsappCountrySearchTerm?.trim() || '';
+    
+    // If search is empty, show all countries immediately
+    if (!searchTerm) {
+      this.filteredWhatsAppCountries = [...this.countryCodes];
+      return;
+    }
+    
+    // Fast filtering with lowercase search term
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    this.filteredWhatsAppCountries = this.countryCodes.filter(country => 
+      country.country.toLowerCase().includes(lowerSearchTerm) ||
+      country.code.includes(searchTerm) ||
+      country.flag.includes(searchTerm)
+    );
+  }
+
+  // Handle WhatsApp country search input with real-time filtering
+  onWhatsAppCountrySearch(event: any) {
+    this.whatsappCountrySearchTerm = event.target.value;
+    // Immediate filtering for fast response
+    this.filterWhatsAppCountries();
+  }
+
+  // Handle when WhatsApp search input is cleared
+  onWhatsAppSearchClear() {
+    this.whatsappCountrySearchTerm = '';
+    this.filterWhatsAppCountries();
   }
 
   // Handle country code change (legacy method)
@@ -748,6 +821,9 @@ export class LeadFormComponent implements OnInit {
     const target = event.target as HTMLElement;
     if (!target.closest('.whatsapp-prefix-container')) {
       this.showCountryDropdown = false;
+    }
+    if (!target.closest('.whatsapp-country-prefix-container')) {
+      this.showWhatsAppCountryDropdown = false;
     }
     if (!target.closest('.state-dropdown-container')) {
       this.showStateDropdown = false;
