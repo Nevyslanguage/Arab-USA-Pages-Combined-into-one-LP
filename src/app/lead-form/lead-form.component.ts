@@ -242,16 +242,16 @@ export class LeadFormComponent implements OnInit {
 
   async sendToZapier(formData: any) {
     try {
-      // Prepare lead form data for ZapierService
+      // Prepare lead form data for ZapierService with full international phone numbers
       const leadFormData: LeadFormData = {
         englishLessonsHistory: formData.englishLessonsHistory || '',
         levelPreference: formData.levelPreference || '',
         availability: formData.availability || '',
         specificTimeSlot: formData.specificTimeSlot || '',
         name: formData.name || '',
-        phone: formData.phone || '',
+        phone: this.getFullPhoneNumber(), // Include country code
         whatsappSame: formData.whatsappSame || '',
-        whatsappNumber: formData.whatsappSame === 'no' ? formData.whatsappNumber : undefined,
+        whatsappNumber: formData.whatsappSame === 'no' ? this.getFullWhatsAppNumber() : undefined,
         email: formData.email || '',
         state: formData.state || '',
         campaignName: formData.campaignName || '',
@@ -273,9 +273,9 @@ export class LeadFormComponent implements OnInit {
         'English Lessons History': formData.englishLessonsHistory,
         'Level Preference': formData.levelPreference,
         'State': formData.state,
-        'Phone': formData.phone,
+        'Phone': this.getFullPhoneNumber(),
         'WhatsApp Same': formData.whatsappSame,
-        'WhatsApp Number': formData.whatsappNumber
+        'WhatsApp Number': formData.whatsappSame === 'no' ? this.getFullWhatsAppNumber() : 'Same as phone'
         // Campaign tracking data removed - only sent in confirmation page
       });
       
@@ -341,11 +341,13 @@ export class LeadFormComponent implements OnInit {
     
     description += `Name: ${formData.name || 'Not provided'}\n`;
     description += `Email: ${formData.email || 'Not provided'}\n`;
-    description += `Phone: ${formData.phone || 'Not provided'}\n`;
+    description += `Phone: ${this.getFullPhoneNumber() || 'Not provided'}\n`;
     description += `WhatsApp Same: ${formData.whatsappSame || 'Not provided'}\n`;
     
     if (formData.whatsappSame === 'no') {
       description += `WhatsApp Number: ${this.getFullWhatsAppNumber()}\n`;
+    } else {
+      description += `WhatsApp Number: ${this.getFullPhoneNumber()} (Same as phone)\n`;
     }
     
     description += `English Lessons History: ${formData.englishLessonsHistory || 'Not provided'}\n`;
@@ -555,6 +557,13 @@ export class LeadFormComponent implements OnInit {
   // Get maximum number of digits allowed for each country code
   getMaxDigitsForCountry(countryCode: string): number {
     return getMaxDigitsForCountry(countryCode);
+  }
+
+  // Get full phone number with country code
+  getFullPhoneNumber(): string {
+    const countryCode = this.selectedCountryCode;
+    const number = this.leadForm.get('phone')?.value || '';
+    return countryCode + ' ' + number;
   }
 
   // Get full WhatsApp number with country code
