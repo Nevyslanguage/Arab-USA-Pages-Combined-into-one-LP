@@ -483,11 +483,11 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       const pageLoadTime = localStorage.getItem('nevys_page_load_time');
       if (pageLoadTime) {
         const timeAwaySeconds = Math.floor((Date.now() - parseInt(pageLoadTime)) / 1000);
-        // Use sendBeacon for mobile devices, regular HTTP for desktop when page is closing
-        this.sendAwayAnalyticsWithBeacon(timeAwaySeconds);
+        // Use same method as desktop for consistency
+        this.sendAwayAnalytics(timeAwaySeconds);
       } else {
         // Fallback to 90 seconds if no page load time
-        this.sendAwayAnalyticsWithBeacon(90);
+        this.sendAwayAnalytics(90);
       }
     });
   }
@@ -1014,7 +1014,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Send away analytics using sendBeacon for mobile devices, regular HTTP for desktop browsers
+  // Send away analytics using same method as desktop for consistency
   private sendAwayAnalyticsWithBeacon(timeAwaySeconds: number) {
     console.log('📡 sendAwayAnalyticsWithBeacon called - User was away for', timeAwaySeconds, 'seconds');
     
@@ -1023,125 +1023,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.log(`⚠️ Data already sent for this session - skipping away analytics`);
       return;
     }
-
-    // Check if this is a mobile device
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    console.log('📱 Mobile device detected for sendBeacon:', isMobile);
     
-    // Calculate form interaction time
-    let formInteractionTime = 0;
-    if (this.formStarted && this.formStartTime > 0) {
-      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
-    }
-
-    // Prepare events data (convert to seconds)
-    const events = {
-      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
-      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
-      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
-      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
-      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
-      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
-      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
-      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
-      form_started: this.formStarted,
-      form_submitted: this.formSubmitted,
-      form_interaction_time: formInteractionTime,
-      time_away_seconds: timeAwaySeconds
-    };
-
-    // Prepare data with actual form state when user left
-    const formData: FormData = {
-      selectedResponse: this.getChoiceEnglish(this.selectedChoice),
-      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
-      otherReason: this.otherCancellationReason || '',
-      marketingConsent: this.selectedSubscription || '',
-      englishImpact: 'Not Applicable',
-      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
-      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
-      pricingResponse: '',
-      name: this.urlParams.name || '',
-      email: this.urlParams.email || '',
-      campaignName: this.urlParams.campaignName || '',
-      adsetName: this.urlParams.adsetName || '',
-      adName: this.urlParams.adName || '',
-      fbClickId: this.urlParams.fbClickId || '',
-      sessionId: this.sessionId,
-      trigger: 'user_away_for_90_plus_seconds',
-      timestamp: new Date().toISOString(),
-      totalSessionTime: Math.floor((Date.now() - this.sessionStartTime) / 1000),
-      events: events,
-      userAgent: navigator.userAgent,
-      pageUrl: window.location.href,
-      formStarted: this.formStarted,
-      formSubmitted: this.formSubmitted,
-      formInteractionTime: formInteractionTime,
-      description: this.formatAwayAnalyticsDescription(events, timeAwaySeconds)
-    };
-
-    console.log('📡 Sending away analytics via sendBeacon:', formData);
-
-    // Use sendBeacon for reliable delivery even when page is backgrounded
-    try {
-      // Convert formData to URL parameters with actual form state
-      const params = new URLSearchParams();
-      params.set('first_name', formData.name || 'Prospect');
-      params.set('last_name', 'Nevys');
-      params.set('company', 'Nevy\'s Language Prospect');
-      params.set('lead_source', 'Website Confirmation Page');
-      params.set('status', 'New');
-      
-      // Calculate appointment status based on actual form state
-      const appointmentStatus = this.getAppointmentStatusForAway(formData.selectedResponse, formData.formSubmitted, formData.formStarted);
-      params.set('appointment_status', appointmentStatus);
-      
-      params.set('response_type', formData.selectedResponse);
-      params.set('cancel_reasons', formData.cancelReasons?.join(', ') || '');
-      params.set('other_reason', formData.otherReason || '');
-      params.set('marketing_consent', formData.marketingConsent);
-      params.set('english_impact', formData.englishImpact);
-      params.set('preferred_start_time', formData.preferredStartTime);
-      params.set('payment_readiness', formData.paymentReadiness);
-      params.set('pricing_response', formData.pricingResponse);
-      params.set('email', formData.email || '');
-      params.set('session_id', formData.sessionId || '');
-      params.set('trigger', formData.trigger || '');
-      params.set('total_session_time', formData.totalSessionTime?.toString() || '0');
-      params.set('form_started', formData.formStarted?.toString() || 'false');
-      params.set('form_submitted', formData.formSubmitted?.toString() || 'false');
-      params.set('form_interaction_time', formData.formInteractionTime?.toString() || '0');
-      params.set('events', JSON.stringify(formData.events));
-      params.set('submission_date', new Date().toISOString());
-      params.set('source_url', window.location.href);
-      params.set('user_agent', navigator.userAgent);
-      params.set('page_url', window.location.href);
-      params.set('description', formData.description || '');
-      params.set('notes', formData.description || '');
-      params.set('comments', formData.description || '');
-
-      const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
-      const fullUrl = `${webhookUrl}?${params.toString()}`;
-      
-      if (isMobile) {
-        // Use sendBeacon for reliable delivery on mobile devices only
-        console.log('📱 Mobile device - using sendBeacon for reliable delivery');
-        const sent = navigator.sendBeacon(fullUrl);
-        
-        if (sent) {
-          console.log('✅ Away analytics successfully sent via sendBeacon (mobile)');
-          this.sessionDataSent = true; // Mark as sent to prevent duplicates
-        } else {
-          console.error('❌ sendBeacon failed to queue the request (mobile)');
-        }
-      } else {
-        // Desktop browsers - use regular HTTP request
-        console.log('🖥️ Desktop browser - using regular HTTP request instead of sendBeacon');
-        this.sendAwayAnalytics(timeAwaySeconds);
-      }
-
-    } catch (error) {
-      console.error('❌ Error sending away analytics via sendBeacon:', error);
-    }
+    // Use same method as desktop for consistency
+    console.log('🔄 Using same method as desktop for consistency');
+    
+    // Just call the working sendAwayAnalytics method
+    this.sendAwayAnalytics(timeAwaySeconds);
   }
 
 
@@ -1941,10 +1828,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       
       if (isMobile) {
         console.log('📱 Mobile device - using sendBeacon for reliable data transmission via ZapierService');
-        
-        // Use ZapierService for consistent data handling
-        await this.zapierService.sendToZapier(formData);
-        
+      
+      // Use ZapierService for consistent data handling
+      await this.zapierService.sendToZapier(formData);
+      
         console.log('✅ Data sent successfully via ZapierService with sendBeacon (mobile)');
       } else {
         console.log('🖥️ Desktop browser - using regular HTTP request instead of sendBeacon');
