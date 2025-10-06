@@ -722,10 +722,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           hiddenStartTime = Date.now();
           localStorage.setItem('awayStartTime', hiddenStartTime.toString());
           localStorage.setItem('awayTrackingActive', 'true');
-          console.log('📱 Mobile: Started tracking on pagehide - will send data when user returns if away for 90+ seconds');
+          console.log('📱 Mobile: Started tracking on pagehide');
           
-          // Don't send data immediately - just start tracking
-          // Data will be sent when user returns if they were away for 90+ seconds
+          // Mobile-friendly: Send data immediately using sendBeacon (works even when page is backgrounded)
+          // This ensures data is sent even if user never returns
+          console.log('📱 Mobile: Sending data immediately using sendBeacon for reliability');
+          this.sendMobileAwayData(90); // Send with 90 seconds as default
         }
       });
       
@@ -827,8 +829,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         console.log('📱 Mobile: beforeunload - Time away:', timeAwaySeconds, 'seconds');
         
         if (timeAwaySeconds >= 90) {
-          console.log('📱 Mobile: beforeunload - Sending analytics as user leaves');
-          this.sendAwayAnalytics(timeAwaySeconds);
+          console.log('📱 Mobile: beforeunload - Sending analytics as user leaves using sendBeacon');
+          this.sendMobileAwayData(timeAwaySeconds);
         } else {
           console.log('📱 Mobile: beforeunload - Not enough time away, storing for later');
           // Store that user left but didn't reach 90 seconds yet
@@ -887,7 +889,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         
         if (timeAwaySeconds >= 90) {
           console.log('🚨 Mobile: Main tracking - User was away for 90+ seconds - Sending analytics!');
-          this.sendAwayAnalytics(timeAwaySeconds);
+          this.sendMobileAwayData(timeAwaySeconds);
         }
         
         // Clear the data
@@ -1018,7 +1020,123 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Mobile-friendly method using sendBeacon (works even when page is backgrounded)
+  private sendMobileAwayData(timeAwaySeconds: number) {
+    console.log('📱 Mobile: sendMobileAwayData called - User was away for', timeAwaySeconds, 'seconds');
+    
+    // Check if data has already been sent for this session
+    if (this.sessionDataSent) {
+      console.log('⚠️ Mobile: Data already sent for this session - skipping');
+      return;
+    }
 
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds)
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime,
+      time_away_seconds: timeAwaySeconds
+    };
+
+    // Prepare data with actual form state when user left
+    const formData = {
+      selectedResponse: this.getChoiceEnglish(this.selectedChoice),
+      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+      otherReason: this.otherCancellationReason || '',
+      marketingConsent: this.selectedSubscription || '',
+      englishImpact: 'Not Applicable',
+      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
+      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
+      pricingResponse: '',
+      name: this.urlParams.name || '',
+      email: this.urlParams.email || '',
+      campaignName: this.urlParams.campaignName || '',
+      adsetName: this.urlParams.adsetName || '',
+      adName: this.urlParams.adName || '',
+      fbClickId: this.urlParams.fbClickId || '',
+      sessionId: this.sessionId,
+      trigger: 'user_away_for_90_plus_seconds',
+      timestamp: new Date().toISOString(),
+      totalSessionTime: Math.floor((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      formInteractionTime: formInteractionTime,
+      description: this.formatAwayAnalyticsDescription(events, timeAwaySeconds)
+    };
+
+    console.log('📱 Mobile: Sending away analytics via sendBeacon:', formData);
+
+    try {
+      // Convert formData to URL parameters for sendBeacon
+      const params = new URLSearchParams();
+      params.set('first_name', formData.name || 'Prospect');
+      params.set('last_name', 'Nevys');
+      params.set('company', 'Nevy\'s Language Prospect');
+      params.set('lead_source', 'Website Confirmation Page');
+      params.set('status', 'New');
+      
+      // Calculate appointment status based on actual form state
+      const appointmentStatus = this.getAppointmentStatusForAway(formData.selectedResponse, formData.formSubmitted, formData.formStarted);
+      params.set('appointment_status', appointmentStatus);
+      
+      params.set('response_type', formData.selectedResponse);
+      params.set('cancel_reasons', formData.cancelReasons?.join(', ') || '');
+      params.set('other_reason', formData.otherReason || '');
+      params.set('marketing_consent', formData.marketingConsent);
+      params.set('english_impact', formData.englishImpact);
+      params.set('preferred_start_time', formData.preferredStartTime);
+      params.set('payment_readiness', formData.paymentReadiness);
+      params.set('pricing_response', formData.pricingResponse);
+      params.set('email', formData.email || '');
+      params.set('session_id', formData.sessionId || '');
+      params.set('trigger', formData.trigger || '');
+      params.set('total_session_time', formData.totalSessionTime?.toString() || '0');
+      params.set('form_started', formData.formStarted?.toString() || 'false');
+      params.set('form_submitted', formData.formSubmitted?.toString() || 'false');
+      params.set('form_interaction_time', formData.formInteractionTime?.toString() || '0');
+      params.set('events', JSON.stringify(formData.events));
+      params.set('submission_date', new Date().toISOString());
+      params.set('source_url', window.location.href);
+      params.set('user_agent', navigator.userAgent);
+      params.set('page_url', window.location.href);
+      params.set('description', formData.description || '');
+      params.set('notes', formData.description || '');
+      params.set('comments', formData.description || '');
+
+      const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
+      const fullUrl = `${webhookUrl}?${params.toString()}`;
+      
+      // Use sendBeacon for reliable delivery on mobile (works even when page is backgrounded)
+      const sent = navigator.sendBeacon(fullUrl);
+      
+      if (sent) {
+        console.log('✅ Mobile: Away analytics successfully sent via sendBeacon');
+        this.sessionDataSent = true; // Mark as sent to prevent duplicates
+      } else {
+        console.error('❌ Mobile: sendBeacon failed to queue the request');
+      }
+
+    } catch (error) {
+      console.error('❌ Mobile: Error sending away analytics via sendBeacon:', error);
+    }
+  }
 
   private formatAwayAnalyticsDescription(events: any, timeAwaySeconds: number): string {
     let description = `Away Analytics - User Was Away for 90+ Seconds\n\n`;
