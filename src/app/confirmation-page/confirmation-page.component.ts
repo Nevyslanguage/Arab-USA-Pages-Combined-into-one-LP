@@ -999,16 +999,19 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Prepare data for ZapierService
+    // Capture any form selections the user made before leaving
+    const userSelections = this.captureUserSelections();
+    
+    // Prepare data for ZapierService with user selections
     const formData: FormData = {
-      selectedResponse: 'User Away',
-      cancelReasons: [],
-      otherReason: '',
-      marketingConsent: '',
+      selectedResponse: userSelections.selectedResponse,
+      cancelReasons: userSelections.cancelReasons,
+      otherReason: userSelections.otherReason,
+      marketingConsent: userSelections.marketingConsent,
       englishImpact: 'Not Applicable',
-      preferredStartTime: '',
-      paymentReadiness: '',
-      pricingResponse: '',
+      preferredStartTime: userSelections.preferredStartTime,
+      paymentReadiness: userSelections.paymentReadiness,
+      pricingResponse: userSelections.pricingResponse,
       name: this.urlParams.name || '',
       email: this.urlParams.email || '',
       campaignName: this.urlParams.campaignName || '',
@@ -1025,7 +1028,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       formStarted: this.formStarted,
       formSubmitted: this.formSubmitted,
       formInteractionTime: formInteractionTime,
-      description: this.formatAwayAnalyticsDescription(events, timeAwaySeconds)
+      description: this.formatAwayAnalyticsDescription(events, timeAwaySeconds, userSelections)
     };
 
     console.log('📡 Sending away analytics via ZapierService:', formData);
@@ -1038,6 +1041,36 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('❌ Error sending away analytics via ZapierService:', error);
     }
+  }
+
+  // Capture any form selections the user made before leaving
+  private captureUserSelections() {
+    console.log('📝 Capturing user selections before leaving:', {
+      selectedChoice: this.selectedChoice,
+      selectedCancellationReasons: this.selectedCancellationReasons,
+      selectedSubscription: this.selectedSubscription,
+      selectedStartTime: this.selectedStartTime,
+      selectedPayment: this.selectedPayment,
+      otherCancellationReason: this.otherCancellationReason
+    });
+
+    // Determine the response type based on what was selected
+    let selectedResponse = 'User Away'; // Default for no interaction
+    if (this.selectedChoice === 'cancel') {
+      selectedResponse = 'Cancel';
+    } else if (this.selectedChoice === 'confirm') {
+      selectedResponse = 'Confirm Interest';
+    }
+
+    return {
+      selectedResponse: selectedResponse,
+      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+      otherReason: this.otherCancellationReason || '',
+      marketingConsent: this.selectedSubscription || '',
+      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
+      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
+      pricingResponse: this.selectedPlan || ''
+    };
   }
 
   // Mobile-friendly method using sendBeacon (works even when page is backgrounded)
@@ -1072,16 +1105,19 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       time_away_seconds: timeAwaySeconds
     };
 
-    // Prepare data with actual form state when user left
+    // Capture any form selections the user made before leaving
+    const userSelections = this.captureUserSelections();
+    
+    // Prepare data with captured user selections
     const formData = {
-      selectedResponse: this.getChoiceEnglish(this.selectedChoice),
-      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
-      otherReason: this.otherCancellationReason || '',
-      marketingConsent: this.selectedSubscription || '',
+      selectedResponse: userSelections.selectedResponse,
+      cancelReasons: userSelections.cancelReasons,
+      otherReason: userSelections.otherReason,
+      marketingConsent: userSelections.marketingConsent,
       englishImpact: 'Not Applicable',
-      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
-      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
-      pricingResponse: '',
+      preferredStartTime: userSelections.preferredStartTime,
+      paymentReadiness: userSelections.paymentReadiness,
+      pricingResponse: userSelections.pricingResponse,
       name: this.urlParams.name || '',
       email: this.urlParams.email || '',
       campaignName: this.urlParams.campaignName || '',
@@ -1098,7 +1134,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       formStarted: this.formStarted,
       formSubmitted: this.formSubmitted,
       formInteractionTime: formInteractionTime,
-      description: this.formatAwayAnalyticsDescription(events, timeAwaySeconds)
+      description: this.formatAwayAnalyticsDescription(events, timeAwaySeconds, this.captureUserSelections())
     };
 
     console.log('📱 Mobile: Sending away analytics via sendBeacon:', formData);
@@ -1158,7 +1194,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private formatAwayAnalyticsDescription(events: any, timeAwaySeconds: number): string {
+  private formatAwayAnalyticsDescription(events: any, timeAwaySeconds: number, userSelections?: any): string {
     let description = `Away Analytics - User Was Away for 90+ Seconds\n\n`;
     
     // Basic information
@@ -1171,28 +1207,52 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Form state when user left
     description += `Form State When User Left:\n`;
-    description += `Selected Choice: ${this.getChoiceEnglish(this.selectedChoice) || 'None'}\n`;
+    description += `Selected Choice: ${userSelections?.selectedResponse || this.getChoiceEnglish(this.selectedChoice) || 'None'}\n`;
     description += `Form Started: ${this.formStarted}\n`;
     description += `Form Submitted: ${this.formSubmitted}\n`;
     
-    if (this.selectedCancellationReasons.length > 0) {
-      description += `Cancellation Reasons: ${this.getCancellationReasonsEnglish(this.selectedCancellationReasons).join(', ')}\n`;
-    }
-    
-    if (this.otherCancellationReason) {
-      description += `Other Reason: ${this.otherCancellationReason}\n`;
-    }
-    
-    if (this.selectedSubscription) {
-      description += `Marketing Consent: ${this.selectedSubscription}\n`;
-    }
-    
-    if (this.selectedStartTime) {
-      description += `Preferred Start Time: ${this.getStartTimeEnglish(this.selectedStartTime)}\n`;
-    }
-    
-    if (this.selectedPayment) {
-      description += `Payment Readiness: ${this.getPaymentEnglish(this.selectedPayment)}\n`;
+    // Use captured user selections if available
+    if (userSelections) {
+      if (userSelections.cancelReasons && userSelections.cancelReasons.length > 0) {
+        description += `Cancellation Reasons: ${userSelections.cancelReasons.join(', ')}\n`;
+      }
+      
+      if (userSelections.otherReason) {
+        description += `Other Reason: ${userSelections.otherReason}\n`;
+      }
+      
+      if (userSelections.marketingConsent) {
+        description += `Marketing Consent: ${userSelections.marketingConsent}\n`;
+      }
+      
+      if (userSelections.preferredStartTime) {
+        description += `Preferred Start Time: ${userSelections.preferredStartTime}\n`;
+      }
+      
+      if (userSelections.paymentReadiness) {
+        description += `Payment Readiness: ${userSelections.paymentReadiness}\n`;
+      }
+    } else {
+      // Fallback to current form state
+      if (this.selectedCancellationReasons.length > 0) {
+        description += `Cancellation Reasons: ${this.getCancellationReasonsEnglish(this.selectedCancellationReasons).join(', ')}\n`;
+      }
+      
+      if (this.otherCancellationReason) {
+        description += `Other Reason: ${this.otherCancellationReason}\n`;
+      }
+      
+      if (this.selectedSubscription) {
+        description += `Marketing Consent: ${this.selectedSubscription}\n`;
+      }
+      
+      if (this.selectedStartTime) {
+        description += `Preferred Start Time: ${this.getStartTimeEnglish(this.selectedStartTime)}\n`;
+      }
+      
+      if (this.selectedPayment) {
+        description += `Payment Readiness: ${this.getPaymentEnglish(this.selectedPayment)}\n`;
+      }
     }
     
     description += `\n`;
