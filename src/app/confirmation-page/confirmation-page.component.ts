@@ -146,6 +146,13 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       this.formStarted = true;
       this.formStartTime = Date.now();
       console.log('📝 Form started - User selected:', choice, 'at:', new Date(this.formStartTime));
+      console.log('🔍 Form state after choice change:', {
+        selectedChoice: this.selectedChoice,
+        formStarted: this.formStarted,
+        formSubmitted: this.formSubmitted
+      });
+    } else {
+      console.log('📝 Form already started - User changed choice to:', choice);
     }
   }
 
@@ -464,15 +471,23 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Also check on page unload (user closed tab/window)
     window.addEventListener('beforeunload', () => {
-      console.log('🚪 Page unloading - sending analytics immediately');
+      console.log('🚪 Page unloading - sending data immediately');
+      
+      // Send session data if not already sent
+      if (!this.sessionDataSent) {
+        console.log('🚪 beforeunload - Sending session data as user leaves');
+        this.sendDataForSession('user_closed_page');
+      }
+      
       // Calculate time away from page load time
       const pageLoadTime = localStorage.getItem('nevys_page_load_time');
       if (pageLoadTime) {
         const timeAwaySeconds = Math.floor((Date.now() - parseInt(pageLoadTime)) / 1000);
-        this.sendAwayAnalytics(timeAwaySeconds);
+        // Use sendBeacon for reliable delivery even when page is closing
+        this.sendAwayAnalyticsWithBeacon(timeAwaySeconds);
       } else {
-        // Fallback to 60 seconds if no page load time
-        this.sendAwayAnalytics(60);
+        // Fallback to 90 seconds if no page load time
+        this.sendAwayAnalyticsWithBeacon(90);
       }
     });
   }
@@ -705,6 +720,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           localStorage.setItem('awayStartTime', hiddenStartTime.toString());
           localStorage.setItem('awayTrackingActive', 'true');
           console.log('📱 Mobile: Started tracking on pagehide');
+          
+          // Send analytics immediately using sendBeacon (works even when page is backgrounded)
+          // This ensures data is sent even if user never returns
+          this.sendAwayAnalyticsWithBeacon(90);
         }
       });
       
@@ -799,6 +818,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Mobile-specific: Add beforeunload for last-chance analytics
     window.addEventListener('beforeunload', () => {
+      // Send session data if not already sent (for both mobile and desktop)
+      if (!this.sessionDataSent) {
+        console.log('📱 Mobile: beforeunload - Sending session data as user leaves');
+        this.sendDataForSession('user_closed_page');
+      }
+      
       if (isMobile && hiddenStartTime) {
         const timeAway = Date.now() - hiddenStartTime;
         const timeAwaySeconds = Math.floor(timeAway / 1000);
@@ -848,6 +873,26 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         localStorage.removeItem('waitingFor90Seconds');
       }
       
+      // NEW: Check for pagehide-based tracking (more reliable for mobile)
+      const awayStartTime = localStorage.getItem('awayStartTime');
+      const awayTrackingActive = localStorage.getItem('awayTrackingActive');
+      
+      if (awayStartTime && awayTrackingActive === 'true') {
+        const timeAway = Date.now() - parseInt(awayStartTime);
+        const timeAwaySeconds = Math.floor(timeAway / 1000);
+        
+        console.log('📱 Mobile: Found pagehide tracking - User was away for', timeAwaySeconds, 'seconds');
+        
+        if (timeAwaySeconds >= 90) {
+          console.log('🚨 Mobile: pagehide tracking - User was away for 90+ seconds - Sending analytics!');
+          this.sendAwayAnalytics(timeAwaySeconds);
+        }
+        
+        // Clear the data
+        localStorage.removeItem('awayStartTime');
+        localStorage.removeItem('awayTrackingActive');
+      }
+      
       // Clear any stale tracking data
       const trackingActive = localStorage.getItem('awayTrackingActive');
       if (trackingActive === 'true') {
@@ -877,6 +922,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   private async sendAwayAnalytics(timeAwaySeconds: number) {
     console.log('🚀 sendAwayAnalytics called - User was away for', timeAwaySeconds, 'seconds (90+ second threshold)');
+    
+    // Check if data has already been sent for this session
+    if (this.sessionDataSent) {
+      console.log(`⚠️ Data already sent for this session - skipping away analytics`);
+      return;
+    }
     
     // Calculate form interaction time
     let formInteractionTime = 0;
@@ -964,6 +1015,125 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Send away analytics using sendBeacon (works even when page is backgrounded)
+  private sendAwayAnalyticsWithBeacon(timeAwaySeconds: number) {
+    console.log('📡 sendAwayAnalyticsWithBeacon called - User was away for', timeAwaySeconds, 'seconds');
+    
+    // Check if data has already been sent for this session
+    if (this.sessionDataSent) {
+      console.log(`⚠️ Data already sent for this session - skipping away analytics`);
+      return;
+    }
+    
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds)
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime,
+      time_away_seconds: timeAwaySeconds
+    };
+
+    // Prepare data with actual form state when user left
+    const formData: FormData = {
+      selectedResponse: this.getChoiceEnglish(this.selectedChoice),
+      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+      otherReason: this.otherCancellationReason || '',
+      marketingConsent: this.selectedSubscription || '',
+      englishImpact: 'Not Applicable',
+      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
+      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
+      pricingResponse: '',
+      name: this.urlParams.name || '',
+      email: this.urlParams.email || '',
+      campaignName: this.urlParams.campaignName || '',
+      adsetName: this.urlParams.adsetName || '',
+      adName: this.urlParams.adName || '',
+      fbClickId: this.urlParams.fbClickId || '',
+      sessionId: this.sessionId,
+      trigger: 'user_away_for_90_plus_seconds',
+      timestamp: new Date().toISOString(),
+      totalSessionTime: Math.floor((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      formInteractionTime: formInteractionTime,
+      description: this.formatAwayAnalyticsDescription(events, timeAwaySeconds)
+    };
+
+    console.log('📡 Sending away analytics via sendBeacon:', formData);
+
+    // Use sendBeacon for reliable delivery even when page is backgrounded
+    try {
+      // Convert formData to URL parameters with actual form state
+      const params = new URLSearchParams();
+      params.set('first_name', formData.name || 'Prospect');
+      params.set('last_name', 'Nevys');
+      params.set('company', 'Nevy\'s Language Prospect');
+      params.set('lead_source', 'Website Confirmation Page');
+      params.set('status', 'New');
+      
+      // Calculate appointment status based on actual form state
+      const appointmentStatus = this.getAppointmentStatusForAway(formData.selectedResponse, formData.formSubmitted, formData.formStarted);
+      params.set('appointment_status', appointmentStatus);
+      
+      params.set('response_type', formData.selectedResponse);
+      params.set('cancel_reasons', formData.cancelReasons?.join(', ') || '');
+      params.set('other_reason', formData.otherReason || '');
+      params.set('marketing_consent', formData.marketingConsent);
+      params.set('english_impact', formData.englishImpact);
+      params.set('preferred_start_time', formData.preferredStartTime);
+      params.set('payment_readiness', formData.paymentReadiness);
+      params.set('pricing_response', formData.pricingResponse);
+      params.set('email', formData.email || '');
+      params.set('session_id', formData.sessionId || '');
+      params.set('trigger', formData.trigger || '');
+      params.set('total_session_time', formData.totalSessionTime?.toString() || '0');
+      params.set('form_started', formData.formStarted?.toString() || 'false');
+      params.set('form_submitted', formData.formSubmitted?.toString() || 'false');
+      params.set('form_interaction_time', formData.formInteractionTime?.toString() || '0');
+      params.set('events', JSON.stringify(formData.events));
+      params.set('submission_date', new Date().toISOString());
+      params.set('source_url', window.location.href);
+      params.set('user_agent', navigator.userAgent);
+      params.set('page_url', window.location.href);
+      params.set('description', formData.description || '');
+      params.set('notes', formData.description || '');
+      params.set('comments', formData.description || '');
+
+      const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
+      const fullUrl = `${webhookUrl}?${params.toString()}`;
+      
+      // Use sendBeacon for reliable delivery
+      const sent = navigator.sendBeacon(fullUrl);
+      
+      if (sent) {
+        console.log('✅ Away analytics successfully sent via sendBeacon');
+        this.sessionDataSent = true; // Mark as sent to prevent duplicates
+      } else {
+        console.error('❌ sendBeacon failed to queue the request');
+      }
+
+    } catch (error) {
+      console.error('❌ Error sending away analytics via sendBeacon:', error);
+    }
+  }
+
 
   private formatAwayAnalyticsDescription(events: any, timeAwaySeconds: number): string {
     let description = `Away Analytics - User Was Away for 90+ Seconds\n\n`;
@@ -975,6 +1145,34 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     description += `Email: ${this.urlParams.email || 'Unknown'}\n`;
     description += `Total Session Time: ${this.formatTime(Math.floor((Date.now() - this.sessionStartTime) / 1000))}\n`;
     description += `Time Away: ${this.formatTime(timeAwaySeconds)}\n\n`;
+    
+    // Form state when user left
+    description += `Form State When User Left:\n`;
+    description += `Selected Choice: ${this.getChoiceEnglish(this.selectedChoice) || 'None'}\n`;
+    description += `Form Started: ${this.formStarted}\n`;
+    description += `Form Submitted: ${this.formSubmitted}\n`;
+    
+    if (this.selectedCancellationReasons.length > 0) {
+      description += `Cancellation Reasons: ${this.getCancellationReasonsEnglish(this.selectedCancellationReasons).join(', ')}\n`;
+    }
+    
+    if (this.otherCancellationReason) {
+      description += `Other Reason: ${this.otherCancellationReason}\n`;
+    }
+    
+    if (this.selectedSubscription) {
+      description += `Marketing Consent: ${this.selectedSubscription}\n`;
+    }
+    
+    if (this.selectedStartTime) {
+      description += `Preferred Start Time: ${this.getStartTimeEnglish(this.selectedStartTime)}\n`;
+    }
+    
+    if (this.selectedPayment) {
+      description += `Payment Readiness: ${this.getPaymentEnglish(this.selectedPayment)}\n`;
+    }
+    
+    description += `\n`;
     
     // Campaign tracking
     if (this.urlParams.campaignName || this.urlParams.adsetName || this.urlParams.adName) {
@@ -1212,44 +1410,17 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
   // Send data using ZapierService (confirmation page data)
   private async sendToZapier(data: any) {
     try {
-      // Convert data to FormData format for ZapierService
-      const formData: FormData = {
-        selectedResponse: data.confirmation_choice || data.selected_choice || 'No response',
-        cancelReasons: data.cancellation_reasons || [],
-        otherReason: data.other_reason || '',
-        marketingConsent: data.subscription_preference || '',
-        englishImpact: 'Not Applicable',
-        preferredStartTime: data.preferred_start_time || '',
-        paymentReadiness: data.payment_access || '',
-        pricingResponse: '',
-        name: data.lead_name || data.name || '',
-        email: data.lead_email || data.email || '',
-        campaignName: data.campaign_name || '',
-        adsetName: data.adset_name || '',
-        adName: data.ad_name || '',
-        fbClickId: data.fb_click_id || '',
-        sessionId: data.session_id || '',
-        trigger: data.trigger || '',
-        timestamp: data.timestamp || new Date().toISOString(),
-        totalSessionTime: data.total_session_time || 0,
-        events: data.events || {},
-        userAgent: data.user_agent || navigator.userAgent,
-        pageUrl: data.page_url || window.location.href,
-        formStarted: data.form_started || false,
-        formSubmitted: data.form_submitted || false,
-        formInteractionTime: data.form_interaction_time || 0,
-        description: data.description || ''
-      };
-
-      console.log('📤 Sending confirmation data via ZapierService:', formData);
+      // Data is already in the correct FormData format from sendDataForSession methods
+      // No need to convert - just pass it directly to ZapierService
+      console.log('📤 Sending data via ZapierService:', data);
       
       // Send using ZapierService
-      await this.zapierService.sendToZapier(formData);
+      await this.zapierService.sendToZapier(data);
       
-      console.log('✅ Confirmation data successfully sent via ZapierService');
+      console.log('✅ Data successfully sent via ZapierService');
       
     } catch (error) {
-      console.error('❌ Error sending confirmation data via ZapierService:', error);
+      console.error('❌ Error sending data via ZapierService:', error);
     }
   }
 
@@ -1265,6 +1436,30 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Mark this session as data sent
     this.sessionDataSent = true;
     console.log(`📤 Sending data for session (scenario: ${scenario})`);
+    console.log(`🔍 Form state at data send:`, {
+      selectedChoice: this.selectedChoice,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      selectedCancellationReasons: this.selectedCancellationReasons,
+      selectedSubscription: this.selectedSubscription,
+      selectedStartTime: this.selectedStartTime,
+      selectedPayment: this.selectedPayment,
+      otherCancellationReason: this.otherCancellationReason
+    });
+    
+    // Handle case where user closes page without any interaction
+    if (!this.selectedChoice && !this.formStarted) {
+      console.log('📝 No user interaction detected - sending minimal data');
+      this.sendMinimalData(scenario);
+      return;
+    }
+    
+    // Handle case where user started form but didn't complete it
+    if (this.formStarted && !this.formSubmitted) {
+      console.log('📝 Partial form completion detected - sending partial form data');
+      this.sendPartialFormData(scenario);
+      return;
+    }
     
     // Calculate form interaction time
     let formInteractionTime = 0;
@@ -1324,6 +1519,132 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       selectedPayment: this.selectedPayment,
       otherCancellationReason: this.otherCancellationReason
     });
+    
+    // Send to Make.com webhook using ZapierService
+    this.sendToZapier(formData);
+  }
+
+  private sendMinimalData(scenario: string) {
+    console.log('📤 Sending minimal data for no-interaction scenario');
+    
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds)
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime
+    };
+
+    // Prepare minimal data for no-interaction scenario
+    const formData: FormData = {
+      selectedResponse: '', // Empty for no interaction
+      cancelReasons: [],
+      otherReason: '',
+      marketingConsent: '',
+      englishImpact: 'Not Applicable',
+      preferredStartTime: '',
+      paymentReadiness: '',
+      pricingResponse: '',
+      name: this.urlParams.name || '',
+      email: this.urlParams.email || '',
+      campaignName: this.urlParams.campaignName || '',
+      adsetName: this.urlParams.adsetName || '',
+      adName: this.urlParams.adName || '',
+      fbClickId: this.urlParams.fbClickId || '',
+      sessionId: this.sessionId,
+      trigger: scenario,
+      timestamp: new Date().toISOString(),
+      totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      formInteractionTime: formInteractionTime
+    };
+
+    console.log(`📊 MINIMAL DATA (${scenario}):`, formData);
+    console.log(`🔍 No interaction scenario - appointment_status will be empty`);
+    
+    // Send to Make.com webhook using ZapierService
+    this.sendToZapier(formData);
+  }
+
+  // Method to handle partial form completion scenarios
+  private sendPartialFormData(scenario: string) {
+    console.log('📤 Sending partial form data for incomplete interaction');
+    
+    // Calculate form interaction time
+    let formInteractionTime = 0;
+    if (this.formStarted && this.formStartTime > 0) {
+      formInteractionTime = Math.round((Date.now() - this.formStartTime) / 1000);
+    }
+
+    // Prepare events data (convert to seconds)
+    const events = {
+      session_duration_on_price_section: Math.round((this.sectionTimers['#pricing-section']?.totalTime || 0) / 1000),
+      session_duration_on_levels_section: Math.round((this.sectionTimers['#levels-section']?.totalTime || 0) / 1000),
+      session_duration_on_teachers_section: Math.round((this.sectionTimers['#teachers-section']?.totalTime || 0) / 1000),
+      session_duration_on_platform_section: Math.round((this.sectionTimers['#platform-section']?.totalTime || 0) / 1000),
+      session_duration_on_advisors_section: Math.round((this.sectionTimers['#consultants-section']?.totalTime || 0) / 1000),
+      session_duration_on_testimonials_section: Math.round((this.sectionTimers['#carousel-section']?.totalTime || 0) / 1000),
+      session_duration_on_form_section: Math.round((this.sectionTimers['#form-section']?.totalTime || 0) / 1000),
+      session_idle_time_duration: Math.round(this.idleTime.total / 1000),
+      form_started: this.formStarted,
+      form_submitted: this.formSubmitted,
+      form_interaction_time: formInteractionTime
+    };
+
+    // Determine the appropriate response based on what was selected
+    let selectedResponse = 'No Response';
+    if (this.selectedChoice === 'cancel') {
+      selectedResponse = 'Cancel';
+    } else if (this.selectedChoice === 'confirm') {
+      selectedResponse = 'Confirm Interest';
+    }
+
+    // Prepare partial form data
+    const formData: FormData = {
+      selectedResponse: selectedResponse,
+      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+      otherReason: this.otherCancellationReason || '',
+      marketingConsent: this.selectedSubscription || '',
+      englishImpact: 'Not Applicable',
+      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
+      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
+      pricingResponse: '',
+      name: this.urlParams.name || '',
+      email: this.urlParams.email || '',
+      campaignName: this.urlParams.campaignName || '',
+      adsetName: this.urlParams.adsetName || '',
+      adName: this.urlParams.adName || '',
+      fbClickId: this.urlParams.fbClickId || '',
+      sessionId: this.sessionId,
+      trigger: scenario,
+      timestamp: new Date().toISOString(),
+      totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      events: events,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      formInteractionTime: formInteractionTime
+    };
+
+    console.log(`📊 PARTIAL FORM DATA (${scenario}):`, formData);
     
     // Send to Make.com webhook using ZapierService
     this.sendToZapier(formData);
@@ -1616,7 +1937,11 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private getAppointmentStatus(selectedResponse: string, formSubmitted?: boolean, formStarted?: boolean): string {
+  // Note: getAppointmentStatus logic is handled by ZapierService
+  // This ensures consistent appointment status calculation across the app
+
+  // Get appointment status for away analytics (same logic as ZapierService)
+  private getAppointmentStatusForAway(selectedResponse: string, formSubmitted?: boolean, formStarted?: boolean): string {
     // If form was not started at all, return empty
     if (formStarted === false) {
       return '';
@@ -1638,9 +1963,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     if (formSubmitted === true) {
       switch (selectedResponse) {
         case 'Confirm Interest':
-          return 'confirmed'; // Google Calendar API: confirmed status
+          return 'Confirmed';
         case 'Cancel':
-          return 'cancelled'; // Google Calendar API: cancelled status
+          return 'Cancelled';
         default:
           return '';
       }
@@ -1654,7 +1979,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // User response section
     description += `User Response: ${formData.selectedResponse || 'No response'}\n`;
-    description += `Appointment Status: ${this.getAppointmentStatus(formData.selectedResponse, formData.formSubmitted, formData.formStarted) || 'Not set (user didn\'t complete form)'}\n\n`;
+    description += `Appointment Status: Will be calculated by ZapierService based on form state\n\n`;
     
     // Show partial form data if they started but didn't complete
     if (formData.formStarted && !formData.formSubmitted) {
@@ -1741,11 +2066,26 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   // Checkbox handling
   onCancellationReasonChange(reason: string, isChecked: boolean) {
+    console.log('🔍 onCancellationReasonChange called:', { reason, isChecked, formStarted: this.formStarted });
+    
     if (isChecked) {
       this.selectedCancellationReasons.push(reason);
     } else {
       this.selectedCancellationReasons = this.selectedCancellationReasons.filter(r => r !== reason);
     }
+    
+    // Track when user starts filling the form
+    if (!this.formStarted) {
+      this.formStarted = true;
+      this.formStartTime = Date.now();
+      console.log('📝 Form started - User selected cancellation reason:', reason, 'at:', new Date(this.formStartTime));
+    }
+    
+    console.log('🔍 Form state after cancellation reason change:', {
+      selectedCancellationReasons: this.selectedCancellationReasons,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted
+    });
   }
 
   isCancellationReasonSelected(reason: string): boolean {
@@ -1754,15 +2094,79 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   // Radio button handling
   onSubscriptionChange(value: string) {
+    console.log('🔍 onSubscriptionChange called:', { value, formStarted: this.formStarted });
+    
     this.selectedSubscription = value;
+    
+    // Track when user starts filling the form
+    if (!this.formStarted) {
+      this.formStarted = true;
+      this.formStartTime = Date.now();
+      console.log('📝 Form started - User selected subscription:', value, 'at:', new Date(this.formStartTime));
+    }
+    
+    console.log('🔍 Form state after subscription change:', {
+      selectedSubscription: this.selectedSubscription,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted
+    });
   }
 
   onStartTimeChange(value: string) {
+    console.log('🔍 onStartTimeChange called:', { value, formStarted: this.formStarted });
+    
     this.selectedStartTime = value;
+    
+    // Track when user starts filling the form
+    if (!this.formStarted) {
+      this.formStarted = true;
+      this.formStartTime = Date.now();
+      console.log('📝 Form started - User selected start time:', value, 'at:', new Date(this.formStartTime));
+    }
+    
+    console.log('🔍 Form state after start time change:', {
+      selectedStartTime: this.selectedStartTime,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted
+    });
   }
 
   onPaymentChange(value: string) {
+    console.log('🔍 onPaymentChange called:', { value, formStarted: this.formStarted });
+    
     this.selectedPayment = value;
+    
+    // Track when user starts filling the form
+    if (!this.formStarted) {
+      this.formStarted = true;
+      this.formStartTime = Date.now();
+      console.log('📝 Form started - User selected payment:', value, 'at:', new Date(this.formStartTime));
+    }
+    
+    console.log('🔍 Form state after payment change:', {
+      selectedPayment: this.selectedPayment,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted
+    });
+  }
+
+  onOtherReasonChange(value: string) {
+    console.log('🔍 onOtherReasonChange called:', { value, formStarted: this.formStarted });
+    
+    this.otherCancellationReason = value;
+    
+    // Track when user starts filling the form
+    if (!this.formStarted) {
+      this.formStarted = true;
+      this.formStartTime = Date.now();
+      console.log('📝 Form started - User typed other reason:', value, 'at:', new Date(this.formStartTime));
+    }
+    
+    console.log('🔍 Form state after other reason change:', {
+      otherCancellationReason: this.otherCancellationReason,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted
+    });
   }
 
   // Modal methods
