@@ -452,7 +452,7 @@ export class ZapierService {
         case 'Cancel':
           return 'Started Cancelling but dropped out';
         default:
-          return 'Started form but dropped out';
+          return '';
       }
     }
     
