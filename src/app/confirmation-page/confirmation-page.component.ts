@@ -594,55 +594,16 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
         console.log('📱 Mobile device:', isMobile);
         
         if (isMobile) {
-          // Mobile: Use multiple fallback methods for reliability
-          console.log('📱 Using mobile-friendly tracking with fallbacks');
+          // Mobile: Send analytics immediately when switching to another app
+          console.log('📱 Mobile: User switched to another app - sending analytics immediately');
           
-          // Store in localStorage for persistence
+          // Store the time when user left
           localStorage.setItem('awayStartTime', hiddenStartTime.toString());
           localStorage.setItem('awayTrackingActive', 'true');
           
-          // Method 1: setTimeout (primary)
-          awayTimer = setTimeout(() => {
-            if (document.hidden && hiddenStartTime) {
-              const timeAway = Date.now() - hiddenStartTime;
-              const timeAwaySeconds = Math.floor(timeAway / 1000);
-              
-              console.log('🚨 Mobile setTimeout: User has been away for 90+ seconds - Sending analytics NOW!');
-              console.log('⏱️ Time away:', timeAwaySeconds, 'seconds');
-              this.sendAwayAnalytics(timeAwaySeconds);
-              
-              // Clear tracking data
-              localStorage.removeItem('awayStartTime');
-              localStorage.removeItem('awayTrackingActive');
-            }
-          }, 90000); // 90 seconds
-          
-          // Method 2: Interval fallback (every 10 seconds) for mobile reliability
-          mobileInterval = setInterval(() => {
-            console.log('📱 Mobile interval running - document.hidden:', document.hidden, 'hiddenStartTime:', hiddenStartTime);
-            
-            if (document.hidden && hiddenStartTime) {
-              const timeAway = Date.now() - hiddenStartTime;
-              const timeAwaySeconds = Math.floor(timeAway / 1000);
-              
-              console.log('📱 Mobile interval check - Time away:', timeAwaySeconds, 'seconds');
-              
-              if (timeAwaySeconds >= 90) {
-                console.log('🚨 Mobile interval: User has been away for 90+ seconds - Sending analytics NOW!');
-                this.sendAwayAnalytics(timeAwaySeconds);
-                
-                // Clear everything
-                clearTimeout(awayTimer);
-                clearInterval(mobileInterval);
-                localStorage.removeItem('awayStartTime');
-                localStorage.removeItem('awayTrackingActive');
-              }
-            } else if (!document.hidden) {
-              // User returned, clear interval
-              console.log('📱 Mobile: User returned, clearing interval');
-              clearInterval(mobileInterval);
-            }
-          }, 10000); // Check every 10 seconds
+          // Mobile: Send analytics immediately when user switches to another app
+          const actualTimeAway = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+          this.sendMobileAwayData(actualTimeAway);
           
         } else {
           // Desktop: Use setTimeout (more reliable on desktop)
