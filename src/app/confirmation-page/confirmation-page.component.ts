@@ -483,7 +483,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       const pageLoadTime = localStorage.getItem('nevys_page_load_time');
       if (pageLoadTime) {
         const timeAwaySeconds = Math.floor((Date.now() - parseInt(pageLoadTime)) / 1000);
-        // Use sendBeacon for reliable delivery even when page is closing
+        // Use sendBeacon for mobile devices, regular HTTP for desktop when page is closing
         this.sendAwayAnalyticsWithBeacon(timeAwaySeconds);
       } else {
         // Fallback to 90 seconds if no page load time
@@ -721,7 +721,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
           localStorage.setItem('awayTrackingActive', 'true');
           console.log('📱 Mobile: Started tracking on pagehide');
           
-          // Send analytics immediately using sendBeacon (works even when page is backgrounded)
+          // Send analytics immediately using sendBeacon for mobile, regular HTTP for desktop
           // This ensures data is sent even if user never returns
           this.sendAwayAnalyticsWithBeacon(90);
         }
@@ -1015,7 +1015,7 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Send away analytics using sendBeacon (works even when page is backgrounded)
+  // Send away analytics using sendBeacon for mobile devices, regular HTTP for desktop browsers
   private sendAwayAnalyticsWithBeacon(timeAwaySeconds: number) {
     console.log('📡 sendAwayAnalyticsWithBeacon called - User was away for', timeAwaySeconds, 'seconds');
     
@@ -1024,6 +1024,10 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.log(`⚠️ Data already sent for this session - skipping away analytics`);
       return;
     }
+
+    // Check if this is a mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log('📱 Mobile device detected for sendBeacon:', isMobile);
     
     // Calculate form interaction time
     let formInteractionTime = 0;
@@ -1119,14 +1123,21 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       const webhookUrl = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
       const fullUrl = `${webhookUrl}?${params.toString()}`;
       
-      // Use sendBeacon for reliable delivery
-      const sent = navigator.sendBeacon(fullUrl);
-      
-      if (sent) {
-        console.log('✅ Away analytics successfully sent via sendBeacon');
-        this.sessionDataSent = true; // Mark as sent to prevent duplicates
+      if (isMobile) {
+        // Use sendBeacon for reliable delivery on mobile devices only
+        console.log('📱 Mobile device - using sendBeacon for reliable delivery');
+        const sent = navigator.sendBeacon(fullUrl);
+        
+        if (sent) {
+          console.log('✅ Away analytics successfully sent via sendBeacon (mobile)');
+          this.sessionDataSent = true; // Mark as sent to prevent duplicates
+        } else {
+          console.error('❌ sendBeacon failed to queue the request (mobile)');
+        }
       } else {
-        console.error('❌ sendBeacon failed to queue the request');
+        // Desktop browsers - use regular HTTP request
+        console.log('🖥️ Desktop browser - using regular HTTP request instead of sendBeacon');
+        this.sendAwayAnalytics(timeAwaySeconds);
       }
 
     } catch (error) {
@@ -1904,9 +1915,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       console.log('📤 Sending to ZapierService with formatted description:', formData);
       console.log('🔍 Cancel reasons being sent:', formData.cancelReasons);
       
-      // Check if this is a page unload scenario and use sendBeacon for reliability
+      // Check if this is a page unload scenario and use sendBeacon for mobile, regular HTTP for desktop
       if (zapierData.trigger === 'page_unload' || zapierData.trigger === 'page_hidden') {
-        console.log('🚪 Page unloading - using sendBeacon for reliable data transmission');
+        console.log('🚪 Page unloading - using sendBeacon for mobile, regular HTTP for desktop');
         this.sendToZapierWithBeacon(formData);
         return;
       }
@@ -1925,12 +1936,25 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
 
   private async sendToZapierWithBeacon(formData: any) {
     try {
-      console.log('📡 Using sendBeacon for reliable data transmission via ZapierService');
+      // Check if this is a mobile device
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      console.log('📱 Mobile device detected for sendToZapierWithBeacon:', isMobile);
       
-      // Use ZapierService for consistent data handling
-      await this.zapierService.sendToZapier(formData);
-      
-      console.log('✅ Data sent successfully via ZapierService with sendBeacon');
+      if (isMobile) {
+        console.log('📱 Mobile device - using sendBeacon for reliable data transmission via ZapierService');
+        
+        // Use ZapierService for consistent data handling
+        await this.zapierService.sendToZapier(formData);
+        
+        console.log('✅ Data sent successfully via ZapierService with sendBeacon (mobile)');
+      } else {
+        console.log('🖥️ Desktop browser - using regular HTTP request instead of sendBeacon');
+        
+        // Use ZapierService for consistent data handling (regular HTTP request)
+        await this.zapierService.sendToZapier(formData);
+        
+        console.log('✅ Data sent successfully via ZapierService (desktop)');
+      }
       
     } catch (error) {
       console.error('❌ Error in sendToZapierWithBeacon via ZapierService:', error);
