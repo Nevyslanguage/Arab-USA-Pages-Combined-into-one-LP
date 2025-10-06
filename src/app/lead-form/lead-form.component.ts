@@ -265,6 +265,20 @@ export class LeadFormComponent implements OnInit {
 
       console.log('Sending lead form data via ZapierService:', leadFormData);
       
+      // Debug specific fields that might be missing
+      console.log('🔍 LEAD FORM DATA DEBUG:', {
+        'Raw Form Data': formData,
+        'Availability (Best Time)': formData.availability,
+        'Specific Time Slot (Detailed Call Time)': formData.specificTimeSlot,
+        'English Lessons History': formData.englishLessonsHistory,
+        'Level Preference': formData.levelPreference,
+        'State': formData.state,
+        'Phone': formData.phone,
+        'WhatsApp Same': formData.whatsappSame,
+        'WhatsApp Number': formData.whatsappNumber
+        // Campaign tracking data removed - only sent in confirmation page
+      });
+      
       // Send to Zapier webhook using ZapierService
       await this.zapierService.sendLeadFormToZapier(leadFormData);
       

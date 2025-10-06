@@ -82,6 +82,11 @@ export class ZapierService {
       params.set('level_preference', leadFormData.levelPreference || '');
       params.set('availability', leadFormData.availability || '');
       params.set('specific_time_slot', leadFormData.specificTimeSlot || '');
+      
+      // Additional field names for better Salesforce mapping
+      params.set('best_time_to_contact', leadFormData.availability || '');
+      params.set('detailed_call_time', leadFormData.specificTimeSlot || '');
+      
       params.set('phone', leadFormData.phone || '');
       params.set('whatsapp_same', leadFormData.whatsappSame || '');
       
@@ -91,11 +96,23 @@ export class ZapierService {
       
       params.set('state', leadFormData.state || '');
       
+      // Additional field mappings for comprehensive data capture
+      params.set('english_level', leadFormData.englishLessonsHistory || '');
+      params.set('preferred_level', leadFormData.levelPreference || '');
+      
       // Campaign tracking data
-      if (leadFormData.campaignName) params.set('campaign_name', leadFormData.campaignName);
-      if (leadFormData.adsetName) params.set('adset_name', leadFormData.adsetName);
-      if (leadFormData.adName) params.set('ad_name', leadFormData.adName);
-      if (leadFormData.fbClickId) params.set('fb_click_id', leadFormData.fbClickId);
+      if (leadFormData.campaignName) {
+        params.set('campaign_name', leadFormData.campaignName);
+      }
+      if (leadFormData.adsetName) {
+        params.set('adset_name', leadFormData.adsetName);
+      }
+      if (leadFormData.adName) {
+        params.set('ad_name', leadFormData.adName);
+      }
+      if (leadFormData.fbClickId) {
+        params.set('fb_click_id', leadFormData.fbClickId);
+      }
       
       // Additional metadata
       params.set('submission_date', new Date().toISOString());
@@ -114,9 +131,25 @@ export class ZapierService {
       console.log('Description being sent:', description);
       console.log('Full URL being sent:', `${this.LEAD_FORM_WEBHOOK_URL}?${params.toString()}`);
       console.log('All parameters being sent:', params.toString());
+      
+      // Specific field debugging
+      console.log('🔍 LEAD FORM FIELD DEBUG:', {
+        'Best Time to Contact': leadFormData.availability,
+        'Detailed Call Time': leadFormData.specificTimeSlot,
+        'English Level': leadFormData.englishLessonsHistory,
+        'Level Preference': leadFormData.levelPreference,
+        'State': leadFormData.state,
+        'Phone': leadFormData.phone,
+        'WhatsApp Same': leadFormData.whatsappSame,
+        'WhatsApp Number': leadFormData.whatsappNumber,
+        'Campaign Name': leadFormData.campaignName,
+        'Adset Name': leadFormData.adsetName,
+        'Ad Name': leadFormData.adName,
+        'FB Click ID': leadFormData.fbClickId
+      });
 
-      // Send as GET request with query parameters
-      const response = await this.http.get(`${this.LEAD_FORM_WEBHOOK_URL}?${params.toString()}`).toPromise();
+      // Send as GET request with query parameters (expect plain text)
+      const response = await this.http.get(`${this.LEAD_FORM_WEBHOOK_URL}?${params.toString()}`, { responseType: 'text' as const }).toPromise();
       return response;
     } catch (error) {
       console.error('Error sending lead form to Zapier:', error);
@@ -141,8 +174,26 @@ export class ZapierService {
       const appointmentStatus = this.getAppointmentStatus(formData.selectedResponse, formData.formSubmitted, formData.formStarted);
       params.set('appointment_status', appointmentStatus);
       
+      // Debug appointment status calculation
+      console.log('🔍 APPOINTMENT STATUS DEBUG:', {
+        selectedResponse: formData.selectedResponse,
+        formSubmitted: formData.formSubmitted,
+        formStarted: formData.formStarted,
+        calculatedStatus: appointmentStatus
+      });
+      
       // Form responses
       params.set('response_type', formData.selectedResponse);
+      
+      // Debug form responses
+      console.log('🔍 FORM RESPONSES DEBUG:', {
+        selectedResponse: formData.selectedResponse,
+        cancelReasons: formData.cancelReasons,
+        otherReason: formData.otherReason,
+        marketingConsent: formData.marketingConsent,
+        preferredStartTime: formData.preferredStartTime,
+        paymentReadiness: formData.paymentReadiness
+      });
       
       // Debug cancel reasons
       console.log('🔍 DEBUG - Cancel reasons in ZapierService:', formData.cancelReasons);
@@ -208,8 +259,8 @@ export class ZapierService {
       console.log('Full URL being sent:', `${this.CONFIRMATION_WEBHOOK_URL}?${params.toString()}`);
       console.log('🔍 DEBUG - All parameters being sent:', params.toString());
 
-      // Send as GET request with query parameters
-      const response = await this.http.get(`${this.CONFIRMATION_WEBHOOK_URL}?${params.toString()}`).toPromise();
+      // Send as GET request with query parameters (expect plain text)
+      const response = await this.http.get(`${this.CONFIRMATION_WEBHOOK_URL}?${params.toString()}`, { responseType: 'text' as const }).toPromise();
       return response;
     } catch (error) {
       console.error('Error sending to Zapier:', error);
@@ -386,7 +437,7 @@ export class ZapierService {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
-  // Get appointment status based on user response
+  // Get appointment status based on user response (using same logic as confirmation page)
   private getAppointmentStatus(selectedResponse: string, formSubmitted?: boolean, formStarted?: boolean): string {
     // If form was not started at all, return empty
     if (formStarted === false) {

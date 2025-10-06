@@ -1287,46 +1287,46 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
       form_interaction_time: formInteractionTime
     };
 
-    // Prepare data for Make.com
-    const scenarioData = {
-      // Lead identification
-      lead_email: this.urlParams.email,
-      lead_name: this.urlParams.name,
-      
-      // Campaign data
-      campaign_name: this.urlParams.campaignName,
-      adset_name: this.urlParams.adsetName,
-      ad_name: this.urlParams.adName,
-      fb_click_id: this.urlParams.fbClickId,
-      
-      // Scenario information
-      scenario: scenario,
+    // Prepare data in the format expected by ZapierService
+    const formData: FormData = {
+      selectedResponse: this.getChoiceEnglish(this.selectedChoice),
+      cancelReasons: this.getCancellationReasonsEnglish(this.selectedCancellationReasons),
+      otherReason: this.otherCancellationReason || '',
+      marketingConsent: this.selectedSubscription || '',
+      englishImpact: 'Not Applicable',
+      preferredStartTime: this.getStartTimeEnglish(this.selectedStartTime),
+      paymentReadiness: this.getPaymentEnglish(this.selectedPayment),
+      pricingResponse: '',
+      name: this.urlParams.name || '',
+      email: this.urlParams.email || '',
+      campaignName: this.urlParams.campaignName || '',
+      adsetName: this.urlParams.adsetName || '',
+      adName: this.urlParams.adName || '',
+      fbClickId: this.urlParams.fbClickId || '',
+      sessionId: this.sessionId,
       trigger: scenario,
-      session_id: this.sessionId,
       timestamp: new Date().toISOString(),
-      total_session_time: Math.round((Date.now() - this.sessionStartTime) / 1000),
+      totalSessionTime: Math.round((Date.now() - this.sessionStartTime) / 1000),
       events: events,
-      user_agent: navigator.userAgent,
-      page_url: window.location.href,
-      
-      // Form interaction data
-      form_started: this.formStarted,
-      form_submitted: this.formSubmitted,
-      form_interaction_time: formInteractionTime,
-      
-      // User choice data (if available)
-      selected_choice: this.selectedChoice,
-      cancellation_reasons: this.selectedCancellationReasons,
-      subscription_preference: this.selectedSubscription,
-      preferred_start_time: this.selectedStartTime,
-      payment_method_available: this.selectedPayment,
-      other_reason: this.otherCancellationReason
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      formStarted: this.formStarted,
+      formSubmitted: this.formSubmitted,
+      formInteractionTime: formInteractionTime
     };
 
-    console.log(`📊 SCENARIO DATA (${scenario}):`, scenarioData);
+    console.log(`📊 SCENARIO DATA (${scenario}):`, formData);
+    console.log(`🔍 Current form state:`, {
+      selectedChoice: this.selectedChoice,
+      selectedCancellationReasons: this.selectedCancellationReasons,
+      selectedSubscription: this.selectedSubscription,
+      selectedStartTime: this.selectedStartTime,
+      selectedPayment: this.selectedPayment,
+      otherCancellationReason: this.otherCancellationReason
+    });
     
-    // Send to Make.com webhook
-    this.sendToZapier(scenarioData);
+    // Send to Make.com webhook using ZapierService
+    this.sendToZapier(formData);
   }
 
   private sendAnalyticsToMake() {
@@ -1638,9 +1638,9 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     if (formSubmitted === true) {
       switch (selectedResponse) {
         case 'Confirm Interest':
-          return 'Confirmed';
+          return 'confirmed'; // Google Calendar API: confirmed status
         case 'Cancel':
-          return 'Cancelled';
+          return 'cancelled'; // Google Calendar API: cancelled status
         default:
           return '';
       }
