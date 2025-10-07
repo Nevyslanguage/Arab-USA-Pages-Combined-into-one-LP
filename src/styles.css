@@ -21,3 +21,29 @@ body::after {
   z-index: -1;
   pointer-events: none;
 }
+
+/* Prevent zoom on input focus for mobile devices */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+textarea,
+select {
+  font-size: 16px !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Additional mobile input styling */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important;
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+}
