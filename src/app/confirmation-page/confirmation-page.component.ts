@@ -783,8 +783,8 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     // Mobile-specific: Add beforeunload for last-chance analytics
     window.addEventListener('beforeunload', () => {
       if (isMobile) {
-        // Mobile: Send analytics immediately when closing page (no time threshold)
-        console.log('📱 Mobile: beforeunload - Sending analytics immediately as user closes page');
+        // Mobile: Send analytics immediately when closing page
+        console.log('📱 Mobile: beforeunload - Sending analytics as user closes page');
         const actualTimeAway = Math.floor((Date.now() - this.sessionStartTime) / 1000);
         this.sendMobileAwayData(actualTimeAway);
       } else if (!isMobile) {
@@ -813,81 +813,18 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
-      console.log('📱 Mobile recovery check on page load');
+      console.log('📱 Mobile recovery check on page load - CLEARING STALE DATA ONLY');
       
-      // Check if user left but didn't reach 90 seconds yet
-      const userLeftTime = localStorage.getItem('userLeftTime');
-      const waitingFor90Seconds = localStorage.getItem('waitingFor90Seconds');
+      // Clear any stale tracking data from previous sessions
+      // DO NOT send any analytics on page load - only clear stale data
+      localStorage.removeItem('userLeftTime');
+      localStorage.removeItem('waitingFor90Seconds');
+      localStorage.removeItem('awayStartTime');
+      localStorage.removeItem('awayTrackingActive');
+      localStorage.removeItem('mobileAwayStartTime');
+      localStorage.removeItem('mobileWaitingFor90Seconds');
       
-      if (userLeftTime && waitingFor90Seconds === 'true') {
-        const timeAway = Date.now() - parseInt(userLeftTime);
-        const timeAwaySeconds = Math.floor(timeAway / 1000);
-        
-        console.log('📱 Mobile: Found user who left but didn\'t reach 90 seconds');
-        console.log('📱 Time away since leaving:', timeAwaySeconds, 'seconds');
-        
-        if (timeAwaySeconds >= 90) {
-          console.log('🚨 Mobile: User was away for 90+ seconds - Sending analytics on return!');
-          this.sendAwayAnalytics(timeAwaySeconds);
-        } else {
-          console.log('📱 Mobile: User returned before 90 seconds - No analytics sent');
-        }
-        
-        // Clear the data
-        localStorage.removeItem('userLeftTime');
-        localStorage.removeItem('waitingFor90Seconds');
-      }
-      
-      // ALSO check for users who have been away for 90+ seconds (same as main tracking)
-      const awayStartTime = localStorage.getItem('awayStartTime');
-      const awayTrackingActive = localStorage.getItem('awayTrackingActive');
-      
-      if (awayStartTime && awayTrackingActive === 'true') {
-        const timeAway = Date.now() - parseInt(awayStartTime);
-        const timeAwaySeconds = Math.floor(timeAway / 1000);
-        
-        console.log('📱 Mobile: Found main tracking - User was away for', timeAwaySeconds, 'seconds');
-        
-        if (timeAwaySeconds >= 90) {
-          console.log('🚨 Mobile: Main tracking - User was away for 90+ seconds - Sending analytics!');
-          this.sendAwayAnalytics(timeAwaySeconds);
-        }
-        
-        // Clear the data
-        localStorage.removeItem('awayStartTime');
-        localStorage.removeItem('awayTrackingActive');
-      }
-      
-      // Check for mobile-specific 90-second delay tracking
-      const mobileAwayStartTime = localStorage.getItem('mobileAwayStartTime');
-      const mobileWaitingFor90Seconds = localStorage.getItem('mobileWaitingFor90Seconds');
-      
-      if (mobileAwayStartTime && mobileWaitingFor90Seconds === 'true') {
-        const timeAway = Date.now() - parseInt(mobileAwayStartTime);
-        const timeAwaySeconds = Math.floor(timeAway / 1000);
-        
-        console.log('📱 Mobile: Found mobile 90-second delay tracking - User was away for', timeAwaySeconds, 'seconds');
-        
-        if (timeAwaySeconds >= 90) {
-          console.log('🚨 Mobile: Mobile delay tracking - User was away for 90+ seconds - Sending analytics!');
-          this.sendAwayAnalytics(timeAwaySeconds);
-        } else {
-          console.log('📱 Mobile: User returned before 90 seconds - No analytics sent');
-        }
-        
-        // Clear the data
-        localStorage.removeItem('mobileAwayStartTime');
-        localStorage.removeItem('mobileWaitingFor90Seconds');
-      }
-      
-      
-      // Clear any stale tracking data
-      const trackingActive = localStorage.getItem('awayTrackingActive');
-      if (trackingActive === 'true') {
-        console.log('📱 Mobile: Clearing stale tracking data');
-        localStorage.removeItem('awayStartTime');
-        localStorage.removeItem('awayTrackingActive');
-      }
+      console.log('📱 Mobile: Cleared all stale tracking data - no analytics sent on page load');
     }
   }
 
@@ -2933,5 +2870,12 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
     
     // Send to Zapier webhook
     this.sendToZapier(sessionData);
+  }
+
+  // Check if confirm form is valid (both start time and payment method selected)
+  isConfirmFormValid(): boolean {
+    return this.selectedChoice === 'confirm' && 
+           this.selectedStartTime !== '' && 
+           this.selectedPayment !== '';
   }
 }
