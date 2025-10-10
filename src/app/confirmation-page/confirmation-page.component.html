@@ -448,6 +448,11 @@
           </div>
           
           <div class="text-center mt-8 pb-5">
+            <!-- Show button when no choice is selected yet -->
+            <button *ngIf="!selectedChoice" type="button" (click)="onWhatsAppClick()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-lg transition duration-200 shadow-lg flex items-center justify-center space-x-3 space-x-reverse mx-auto">
+              <span>إرسال النموذج</span>
+            </button>
+
             <!-- Show WhatsApp button only when user confirms and form is valid -->
             <button *ngIf="selectedChoice === 'confirm'" type="button" (click)="onWhatsAppClick()" 
                     [disabled]="!isConfirmFormValid()"
@@ -464,8 +469,15 @@
               <span>تواصل معنا عبر الواتساب</span>
             </button>
             
-            <!-- Show regular submit button for other choices -->
-            <button *ngIf="selectedChoice !== 'confirm'" type="button" (click)="onWhatsAppClick()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-lg transition duration-200 shadow-lg flex items-center justify-center space-x-3 space-x-reverse mx-auto">
+            <!-- Show regular submit button for cancel choice with validation -->
+            <button *ngIf="selectedChoice === 'cancel'" type="button" (click)="onWhatsAppClick()" 
+                    [disabled]="!isCancelFormValid()"
+                    [class.bg-green-600]="isCancelFormValid()"
+                    [class.hover:bg-green-700]="isCancelFormValid()"
+                    [class.bg-gray-400]="!isCancelFormValid()"
+                    [class.cursor-not-allowed]="!isCancelFormValid()"
+                    [class.cursor-pointer]="isCancelFormValid()"
+                    class="text-white font-bold py-4 px-8 rounded-lg text-lg transition duration-200 shadow-lg flex items-center justify-center space-x-3 space-x-reverse mx-auto">
               <span>إرسال النموذج</span>
             </button>
             

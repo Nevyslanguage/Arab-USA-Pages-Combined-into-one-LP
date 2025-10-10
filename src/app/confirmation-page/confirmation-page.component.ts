@@ -2878,4 +2878,11 @@ export class ConfirmationPageComponent implements OnInit, OnDestroy {
            this.selectedStartTime !== '' && 
            this.selectedPayment !== '';
   }
+
+  // Check if cancel form is valid (at least one cancellation reason selected and subscription preference chosen)
+  isCancelFormValid(): boolean {
+    return this.selectedChoice === 'cancel' && 
+           this.selectedCancellationReasons.length > 0 && 
+           this.selectedSubscription !== '';
+  }
 }
