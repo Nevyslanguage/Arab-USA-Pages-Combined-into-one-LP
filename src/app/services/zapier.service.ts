@@ -59,7 +59,8 @@ export interface LeadFormData {
 export class ZapierService {
   // Webhook URLs for different purposes
   private readonly LEAD_FORM_WEBHOOK_URL = 'https://hook.us1.make.com/bsfdoly1dekmske3r620ydu5p3d3hnor';
-  private readonly CONFIRMATION_WEBHOOK_URL = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
+  // private readonly CONFIRMATION_WEBHOOK_URL = 'https://hook.us1.make.com/uc37wscl0r75np86zrss260m9mecyubf';
+  private readonly CONFIRMATION_WEBHOOK_URL = 'https://hook.us1.make.com/mg2gg69ynee6or7x8pv5pzt1x3ewjl1t';
 
   constructor(private http: HttpClient) {}
 
